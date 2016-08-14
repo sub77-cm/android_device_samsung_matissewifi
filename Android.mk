@@ -22,6 +22,6 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(TARGET_DEVICE),ks01lte)
+ifeq ($(TARGET_DEVICE),matissewifi)
 include $(call all-subdir-makefiles,$(LOCAL_PATH))
 endif

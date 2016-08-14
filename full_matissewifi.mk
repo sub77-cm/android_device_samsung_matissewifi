@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
- 
+
 #
 # This file is the build configuration for a full Android
 # build for maguro hardware. This cleanly combines a set of
@@ -21,23 +21,22 @@
 # details, it only fundamentally contains two inherit-product
 # lines, full and maguro, hence its name.
 #
- 
+
 # Inherit from those products. Most specific first.
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-# Inherit from ks01lte device
-$(call inherit-product, device/samsung/ks01lte/device.mk)
+# Inherit from matissewifi device
+$(call inherit-product, device/samsung/matissewifi/device.mk)
 
 # Set those variables here to overwrite the inherited values.
-PRODUCT_NAME := ks01ltexx
-PRODUCT_DEVICE := ks01lte
+PRODUCT_NAME := matissewifixx
+PRODUCT_DEVICE := matissewifi
 PRODUCT_BRAND := samsung
 PRODUCT_MANUFACTURER := samsung
-PRODUCT_MODEL := GT-I9506
+PRODUCT_MODEL := SM-T530
 
 PRODUCT_GMS_CLIENTID_BASE := android-samsung
 
-PRODUCT_BUILD_PROP_OVERRIDES += TARGET_DEVICE=ks01lte \
-        PRODUCT_NAME=ks01ltexx \
-        BUILD_FINGERPRINT=samsung/ks01ltexx/ks01lte:5.0.1/LRX22C/I9506XXUDOJ2:user/release-keys \
-        PRIVATE_BUILD_DESC="ks01ltexx-user 5.0.1 LRX22C I9506XXUDOJ2 release-keys"
-
+PRODUCT_BUILD_PROP_OVERRIDES += TARGET_DEVICE=matissewifi \
+        PRODUCT_NAME=matissewifixx \
+        BUILD_FINGERPRINT=samsung/matissewifixx/matissewifi:5.0.1/LRX22C/I9506XXUDOJ2:user/release-keys \
+        PRIVATE_BUILD_DESC="matissewifixx-user 5.0.1 LRX22C I9506XXUDOJ2 release-keys"
