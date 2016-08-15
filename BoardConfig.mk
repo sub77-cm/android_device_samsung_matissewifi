@@ -103,12 +103,6 @@ WPA_SUPPLICANT_VERSION           := VER_0_8_X
 WIFI_DRIVER_FW_PATH_STA          := "sta"
 WIFI_DRIVER_FW_PATH_AP           := "ap"
 
-# RIL
-BOARD_VENDOR := samsung
-BOARD_MOBILEDATA_INTERFACE_NAME := "rmnet0"
-BOARD_PROVIDES_LIBRIL := true
-TARGET_RIL_VARIANT := caf
-
 # Protobuf-c
 PROTOBUF_SUPPORTED := true
 
@@ -119,9 +113,6 @@ SF_VSYNC_EVENT_PHASE_OFFSET_NS := 0000000
 
 # CMHW
 BOARD_HARDWARE_CLASS += device/samsung/matissewifi/cmhw
-
-# RIL Class (for correct tech assignment)
-BOARD_RIL_CLASS := ../../../device/samsung/matissewifi/ril
 
 # Camera
 TARGET_USE_COMPAT_GRALLOC_ALIGN := true

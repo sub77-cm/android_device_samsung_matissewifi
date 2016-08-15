@@ -16,18 +16,8 @@ ro.sf.lcd_density=160
 persist.gps.qc_nlp_in_use=0
 ro.gps.agps_provider=1
 
-# Radio
-persist.data.netmgrd.qos.enable=true
-persist.radio.add_power_save=1
-persist.radio.apm_sim_not_pwdn=1
-persist.radio.no_wait_for_card=1
-persist.eons.enabled=false
-persist.radio.use_se_table_only=1
-
-rild.libargs=-d /dev/smd0
-rild.libpath=/system/lib/libsec-ril.so
-ro.telephony.call_ring.multiple=false
-telephony.lteOnGsmDevice=1
+# radio
+ro.radio.noril=yes
 
 #Simulate sdcard on /data/media
 persist.fuse_sdcard=true
