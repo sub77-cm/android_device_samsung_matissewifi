@@ -149,10 +149,6 @@ PRODUCT_PACKAGES += \
    libwcnss_qmi \
    wcnss_service
 
-# Radio
-#PRODUCT_PROPERTY_OVERRIDES += \
-#   ro.telephony.ril_class=KslteRIL
-
 # Audio
 PRODUCT_PROPERTY_OVERRIDES += \
    mm.enable.smoothstreaming=true \

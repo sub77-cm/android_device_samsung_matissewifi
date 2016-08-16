@@ -73,7 +73,6 @@ BOARD_FLASH_BLOCK_SIZE := 131072
 
 # Power HAL
 TARGET_POWERHAL_VARIANT := qcom
-TARGET_USES_CPU_BOOST_HINT := true
 TARGET_POWERHAL_SET_INTERACTIVE_EXT := device/samsung/matissewifi/power/power_ext.c
 
 # Recovery
