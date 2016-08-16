@@ -1,0 +1,30 @@
+From f166da253d3e84324aafed60363521f659559599 Mon Sep 17 00:00:00 2001
+From: sub77 <sub77@ymail.com>
+Date: Tue, 16 Aug 2016 02:26:09 +0000
+Subject: [PATCH] Set Audiosource
+
+Change-Id: I14e0f6fd14e27c4869c46fac0bff1b3585b1975b
+---
+ src/com/android/camera/VideoModule.java | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/com/android/camera/VideoModule.java b/src/com/android/camera/VideoModule.java
+index 721fb95..01d078d 100644
+--- a/src/com/android/camera/VideoModule.java
++++ b/src/com/android/camera/VideoModule.java
+@@ -1617,10 +1617,10 @@ public class VideoModule implements CameraModule,
+             mMediaRecorder.setVideoEncoder(mProfile.videoCodec);
+         } else if (isHSR) {
+             mProfile.videoBitRate *= captureRate / 30;
+-            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
++            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+             mMediaRecorder.setProfile(mProfile);
+         } else {
+-            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
++            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+             mMediaRecorder.setProfile(mProfile);
+         }
+ 
+-- 
+2.5.0
+
