@@ -1,0 +1,8392 @@
+From 73a24ffccdecfd1fa8ac877b48c5a6f643da30eb Mon Sep 17 00:00:00 2001
+From: Arne Coucheron <arco68@gmail.com>
+Date: Tue, 31 May 2016 03:25:14 -0700
+Subject: [PATCH] d2: Shift to new audio HAL
+
+ * Add audio effects
+ * Add custom audio platform info
+ * Add custom mixer paths
+ * Update audio policy
+ * Update audio properties, flags and packages
+ * Remove deprecated audio configs
+
+Change-Id: I892c3ca0a90a25694dc5b1ebb9493a7e70f483ce
+Signed-off-by: Paul Keith <javelinanddart@gmail.com>
+---
+
+diff --git a/BoardConfigCommon.mk b/BoardConfigCommon.mk
+index b2c197e..587a046 100644
+--- a/BoardConfigCommon.mk
++++ b/BoardConfigCommon.mk
+@@ -37,15 +37,8 @@
+ 
+ # Audio
+ BOARD_HAVE_AUDIENCE_A2220 := true
+-BOARD_HAVE_DOCK_USBAUDIO := true
+-BOARD_HAVE_SAMSUNG_AUDIO := true
+ BOARD_HAVE_SAMSUNG_CSDCLIENT := true
+-BOARD_USES_FLUENCE_INCALL := true
+-BOARD_USES_FLUENCE_FOR_VOIP := true
+-BOARD_USES_SEPERATED_AUDIO_INPUT := true
+-BOARD_USES_SEPERATED_HEADSET_MIC := true
+-BOARD_USES_SEPERATED_VOICE_SPEAKER := true
+-BOARD_USES_SEPERATED_VOIP := true
++USE_CUSTOM_AUDIO_POLICY := 1
+ 
+ # Bluetooth
+ BOARD_BLUEDROID_VENDOR_CONF := device/samsung/d2-common/bluetooth/vnd_d2.txt
+diff --git a/audio/audio_effects.conf b/audio/audio_effects.conf
+new file mode 100644
+index 0000000..48801d9
+--- /dev/null
++++ b/audio/audio_effects.conf
+@@ -0,0 +1,128 @@
++# List of effect libraries to load. Each library element must contain a "path" element
++# giving the full path of the library .so file.
++#    libraries {
++#        <lib name> {
++#          path <lib path>
++#        }
++#    }
++libraries {
++  bundle {
++    path /system/lib/soundfx/libbundlewrapper.so
++  }
++  reverb {
++    path /system/lib/soundfx/libreverbwrapper.so
++  }
++  visualizer {
++    path /system/lib/soundfx/libvisualizer.so
++  }
++  qcom_pre_processing {
++    path /system/lib/soundfx/libqcomvoiceprocessing.so
++  }
++  downmix {
++    path /system/lib/soundfx/libdownmix.so
++  }
++  loudness_enhancer {
++    path /system/lib/soundfx/libldnhncr.so
++  }
++}
++
++# list of effects to load. Each effect element must contain a "library" and a "uuid" element.
++# The value of the "library" element must correspond to the name of one library element in the
++# "libraries" element.
++# The name of the effect element is indicative, only the value of the "uuid" element
++# designates the effect.
++# The uuid is the implementation specific UUID as specified by the effect vendor. This is not the
++# generic effect type UUID.
++#    effects {
++#        <fx name> {
++#            library <lib name>
++#            uuid <effect uuid>
++#        }
++#        ...
++#    }
++
++effects {
++  bassboost {
++    library bundle
++    uuid 8631f300-72e2-11df-b57e-0002a5d5c51b
++  }
++  virtualizer {
++    library bundle
++    uuid 1d4033c0-8557-11df-9f2d-0002a5d5c51b
++  }
++  equalizer {
++    library bundle
++    uuid ce772f20-847d-11df-bb17-0002a5d5c51b
++  }
++  volume {
++    library bundle
++    uuid 119341a0-8469-11df-81f9-0002a5d5c51b
++  }
++  reverb_env_aux {
++    library reverb
++    uuid 4a387fc0-8ab3-11df-8bad-0002a5d5c51b
++  }
++  reverb_env_ins {
++    library reverb
++    uuid c7a511a0-a3bb-11df-860e-0002a5d5c51b
++  }
++  reverb_pre_aux {
++    library reverb
++    uuid f29a1400-a3bb-11df-8ddc-0002a5d5c51b
++  }
++  reverb_pre_ins {
++    library reverb
++    uuid 172cdf00-a3bc-11df-a72f-0002a5d5c51b
++  }
++  visualizer {
++    library visualizer
++    uuid d069d9e0-8329-11df-9168-0002a5d5c51b
++  }
++  downmix {
++    library downmix
++    uuid 93f04452-e4fe-41cc-91f9-e475b6d1d69f
++  }
++  aec {
++    library qcom_pre_processing
++    uuid 0f8d0d2a-59e5-45fe-b6e4-248c8a799109
++  }
++  loudness_enhancer {
++    library loudness_enhancer
++    uuid fa415329-2034-4bea-b5dc-5b381c8d1e2c
++  }
++}
++# Audio preprocessor configurations.
++# The pre processor configuration consists in a list of elements each describing
++# pre processor settings for a given input source. Valid input source names are:
++# "mic", "camcorder", "voice_recognition", "voice_communication"
++# Each input source element contains a list of effects elements. The name of the effect
++# element must be the name of one of the effects in the "effects" list of the file.
++# Each effect element may optionally contain a list of parameters and their
++# default value to apply when the pre processor effect is created.
++# A parameter is defined by a "param" element and a "value" element. Each of these elements
++# consists in one or more elements specifying a type followed by a value.
++# The types defined are: "int", "short", "float", "bool" and "string"
++# When both "param" and "value" are a single int, a simple form is allowed where just
++# the param and value pair is present in the parameter description
++#    pre_processing {
++#        <input source name> {
++#            <fx name> {
++#                <param 1 name> {
++#                    param {
++#                        int|short|float|bool|string <value>
++#                        [ int|short|float|bool|string <value> ]
++#                        ...
++#                    }
++#                    value {
++#                        int|short|float|bool|string <value>
++#                        [ int|short|float|bool|string <value> ]
++#                        ...
++#                    }
++#                }
++#                <param 2 name > {<param> <value>}
++#                ...
++#            }
++#            ...
++#        }
++#        ...
++#    }
+diff --git a/audio/audio_platform_info.xml b/audio/audio_platform_info.xml
+new file mode 100644
+index 0000000..9b07c89
+--- /dev/null
++++ b/audio/audio_platform_info.xml
+@@ -0,0 +1,75 @@
++<?xml version="1.0" encoding="ISO-8859-1"?>
++<!-- Copyright (c) 2014, The Linux Foundation. All rights reserved.         -->
++<!--                                                                        -->
++<!-- Redistribution and use in source and binary forms, with or without     -->
++<!-- modification, are permitted provided that the following conditions are -->
++<!-- met:                                                                   -->
++<!--     * Redistributions of source code must retain the above copyright   -->
++<!--       notice, this list of conditions and the following disclaimer.    -->
++<!--     * Redistributions in binary form must reproduce the above          -->
++<!--       copyright notice, this list of conditions and the following      -->
++<!--       disclaimer in the documentation and/or other materials provided  -->
++<!--       with the distribution.                                           -->
++<!--     * Neither the name of The Linux Foundation nor the names of its    -->
++<!--       contributors may be used to endorse or promote products derived  -->
++<!--       from this software without specific prior written permission.    -->
++<!--                                                                        -->
++<!-- THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED           -->
++<!-- WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF   -->
++<!-- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT -->
++<!-- ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS -->
++<!-- BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR -->
++<!-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF   -->
++<!-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR        -->
++<!-- BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  -->
++<!-- OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN -->
++<!-- IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                          -->
++<audio_platform_info>
++    <acdb_ids>
++        <!-- Output devices -->
++        <device name="SND_DEVICE_OUT_SPEAKER" acdb_id="15" />
++        <device name="SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES" acdb_id="15" />
++        <device name="SND_DEVICE_OUT_SPEAKER_AND_HDMI" acdb_id="15" />
++        <device name="SND_DEVICE_OUT_VOICE_SPEAKER" acdb_id="15" />
++        <device name="SND_DEVICE_OUT_BT_SCO" acdb_id="50" />
++        <device name="SND_DEVICE_OUT_VOIP_HANDSET" acdb_id="7" />
++        <device name="SND_DEVICE_OUT_VOIP_HEADPHONES" acdb_id="10" />
++        <device name="SND_DEVICE_OUT_VOIP_SPEAKER" acdb_id="15" />
++        <device name="SND_DEVICE_OUT_VOICE_TTY_HCO_HANDSET" acdb_id="17"/>
++
++        <!-- Input devices -->
++        <device name="SND_DEVICE_IN_HANDSET_MIC" acdb_id="54" />
++        <device name="SND_DEVICE_IN_HANDSET_DMIC" acdb_id="52" />
++        <device name="SND_DEVICE_IN_SPEAKER_DMIC" acdb_id="11" />
++        <device name="SND_DEVICE_IN_HANDSET_STEREO_DMIC" acdb_id="4" />
++        <device name="SND_DEVICE_IN_SPEAKER_STEREO_DMIC" acdb_id="11" />
++        <device name="SND_DEVICE_IN_VOICE_DMIC" acdb_id="4" />
++        <device name="SND_DEVICE_IN_VOICE_REC_DMIC_STEREO" acdb_id="53" />
++        <device name="SND_DEVICE_IN_VOICE_SPEAKER_DMIC" acdb_id="11" />
++        <device name="SND_DEVICE_IN_VOICE_REC_MIC" acdb_id="53" />
++        <device name="SND_DEVICE_IN_CAMCORDER_MIC" acdb_id="56" />
++        <device name="SND_DEVICE_IN_BT_SCO_MIC" acdb_id="51" />
++        <device name="SND_DEVICE_IN_VOIP_HANDSET_MIC" acdb_id="57" />
++        <device name="SND_DEVICE_IN_VOIP_SPEAKER_MIC" acdb_id="58" />
++        <device name="SND_DEVICE_IN_VOIP_HEADSET_MIC" acdb_id="59" />
++        <device name="SND_DEVICE_IN_VOICE_TTY_VCO_HANDSET_MIC" acdb_id="16" />
++    </acdb_ids>
++
++    <backend_names>
++        <!-- empty -->
++    </backend_names>
++
++    <pcm_ids>
++        <usecase name="USECASE_AUDIO_PLAYBACK_LOW_LATENCY" type="out" id="14"/>
++        <usecase name="USECASE_AUDIO_RECORD_LOW_LATENCY" type="in" id="14" />
++    </pcm_ids>
++
++    <device_names>
++        <device name="SND_DEVICE_IN_VOICE_DMIC" alias="voice-handset-mic" />
++        <device name="SND_DEVICE_IN_VOICE_SPEAKER_DMIC" alias="voice-speaker-mic" />
++        <device name="SND_DEVICE_IN_VOICE_REC_DMIC_STEREO" alias="voice-rec-mic" />
++        <device name="SND_DEVICE_IN_HANDSET_STEREO_DMIC" alias="handset-mic" />
++        <device name="SND_DEVICE_IN_SPEAKER_DMIC" alias="speaker-mic" />
++        <device name="SND_DEVICE_IN_SPEAKER_STEREO_DMIC" alias="speaker-mic" />
++    </device_names>
++</audio_platform_info>
+diff --git a/audio/audio_policy.conf b/audio/audio_policy.conf
+index d86b2b5..89729de 100644
+--- a/audio/audio_policy.conf
++++ b/audio/audio_policy.conf
+@@ -3,9 +3,9 @@
+ # Devices are designated by a string that corresponds to the enum in audio.h
+ 
+ global_configuration {
+-  attached_output_devices AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_EARPIECE
++  attached_output_devices AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_TELEPHONY_TX
+   default_output_device AUDIO_DEVICE_OUT_SPEAKER
+-  attached_input_devices AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_BACK_MIC|AUDIO_DEVICE_IN_VOICE_CALL|AUDIO_DEVICE_IN_REMOTE_SUBMIX
++  attached_input_devices AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_BACK_MIC|AUDIO_DEVICE_IN_REMOTE_SUBMIX|AUDIO_DEVICE_IN_VOICE_CALL|AUDIO_DEVICE_IN_TELEPHONY_RX|AUDIO_DEVICE_IN_FM_TUNER
+ }
+ 
+ # audio hardware module section: contains descriptors for all audio hw modules present on the
+@@ -22,27 +22,53 @@
+ audio_hw_modules {
+   primary {
+     outputs {
+-      hdmi {
+-        sampling_rates 44100|48000
+-        channel_masks dynamic
+-        formats AUDIO_FORMAT_PCM_16_BIT
+-        devices AUDIO_DEVICE_OUT_AUX_DIGITAL
+-        flags AUDIO_OUTPUT_FLAG_DIRECT
+-      }
+       primary {
+         sampling_rates 44100|48000
+         channel_masks AUDIO_CHANNEL_OUT_STEREO
+         formats AUDIO_FORMAT_PCM_16_BIT
+-        devices AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_WIRED_HEADSET|AUDIO_DEVICE_OUT_WIRED_HEADPHONE|AUDIO_DEVICE_OUT_ALL_SCO|AUDIO_DEVICE_OUT_AUX_DIGITAL|AUDIO_DEVICE_OUT_ALL_USB
++        devices AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_WIRED_HEADSET|AUDIO_DEVICE_OUT_WIRED_HEADPHONE|AUDIO_DEVICE_OUT_ALL_SCO|AUDIO_DEVICE_OUT_AUX_DIGITAL|AUDIO_DEVICE_OUT_PROXY|AUDIO_DEVICE_OUT_FM
+         flags AUDIO_OUTPUT_FLAG_PRIMARY
++      }
++      low_latency {
++        sampling_rates 44100|48000
++        channel_masks AUDIO_CHANNEL_OUT_STEREO
++        formats AUDIO_FORMAT_PCM_16_BIT
++        devices AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_WIRED_HEADSET|AUDIO_DEVICE_OUT_WIRED_HEADPHONE|AUDIO_DEVICE_OUT_ALL_SCO|AUDIO_DEVICE_OUT_AUX_DIGITAL|AUDIO_DEVICE_OUT_PROXY|AUDIO_DEVICE_OUT_FM
++        flags AUDIO_OUTPUT_FLAG_FAST
++      }
++      multichannel {
++        sampling_rates 44100|48000
++        channel_masks dynamic
++        formats AUDIO_FORMAT_PCM_16_BIT
++        devices AUDIO_DEVICE_OUT_AUX_DIGITAL|AUDIO_DEVICE_OUT_PROXY
++        flags AUDIO_OUTPUT_FLAG_DIRECT
++      }
++      voice_tx {
++        sampling_rates 8000|16000|48000
++        channel_masks AUDIO_CHANNEL_OUT_STEREO|AUDIO_CHANNEL_OUT_MONO
++        formats AUDIO_FORMAT_PCM_16_BIT
++        devices AUDIO_DEVICE_OUT_TELEPHONY_TX
++      }
++      voip_rx {
++        sampling_rates 8000|16000
++        channel_masks AUDIO_CHANNEL_OUT_MONO
++        formats AUDIO_FORMAT_PCM_16_BIT|AUDIO_FORMAT_AMR_NB|AUDIO_FORMAT_AMR_WB|AUDIO_FORMAT_QCELP|AUDIO_FORMAT_EVRC|AUDIO_FORMAT_EVRCB|AUDIO_FORMAT_EVRCWB|AUDIO_FORMAT_EVRCNW
++        devices AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_WIRED_HEADSET|AUDIO_DEVICE_OUT_WIRED_HEADPHONE|AUDIO_DEVICE_OUT_ALL_SCO
++        flags AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_VOIP_RX
+       }
+     }
+     inputs {
+       primary {
+         sampling_rates 8000|11025|12000|16000|22050|24000|32000|44100|48000
+-        channel_masks AUDIO_CHANNEL_IN_MONO|AUDIO_CHANNEL_IN_STEREO|AUDIO_CHANNEL_IN_VOICE_CALL_MONO|AUDIO_CHANNEL_IN_VOICE_DNLINK_MONO|AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO
+-        formats AUDIO_FORMAT_PCM_16_BIT|AUDIO_FORMAT_AMR_WB
+-        devices AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_BACK_MIC|AUDIO_DEVICE_IN_WIRED_HEADSET|AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET|AUDIO_DEVICE_IN_AUX_DIGITAL|AUDIO_DEVICE_IN_VOICE_CALL|AUDIO_DEVICE_IN_COMMUNICATION
++        channel_masks AUDIO_CHANNEL_IN_MONO|AUDIO_CHANNEL_IN_STEREO
++        formats AUDIO_FORMAT_PCM_16_BIT|AUDIO_FORMAT_AMR_NB|AUDIO_FORMAT_AMR_WB|AUDIO_FORMAT_QCELP|AUDIO_FORMAT_EVRC|AUDIO_FORMAT_EVRCB|AUDIO_FORMAT_EVRCWB|AUDIO_FORMAT_EVRCNW
++        devices AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_WIRED_HEADSET|AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET|AUDIO_DEVICE_IN_BACK_MIC|AUDIO_DEVICE_IN_VOICE_CALL|AUDIO_DEVICE_IN_FM_TUNER
++      }
++      voice_rx {
++        sampling_rates 8000|16000|48000
++        channel_masks AUDIO_CHANNEL_IN_STEREO|AUDIO_CHANNEL_IN_MONO
++        formats AUDIO_FORMAT_PCM_16_BIT
++        devices AUDIO_DEVICE_IN_TELEPHONY_RX
+       }
+     }
+   }
+@@ -56,6 +82,30 @@
+       }
+     }
+   }
++  usb {
++    outputs {
++      usb_accessory {
++        sampling_rates 44100
++        channel_masks AUDIO_CHANNEL_OUT_STEREO
++        formats AUDIO_FORMAT_PCM_16_BIT
++        devices AUDIO_DEVICE_OUT_USB_ACCESSORY
++      }
++      usb_device {
++        sampling_rates dynamic
++        channel_masks dynamic
++        formats dynamic
++        devices AUDIO_DEVICE_OUT_USB_DEVICE
++      }
++    }
++    inputs {
++      usb_device {
++        sampling_rates dynamic
++        channel_masks dynamic
++        formats dynamic
++        devices AUDIO_DEVICE_IN_USB_DEVICE
++      }
++    }
++  }
+   r_submix {
+     outputs {
+       submix {
+diff --git a/audio/mixer_paths.xml b/audio/mixer_paths.xml
+new file mode 100644
+index 0000000..aa1bb57
+--- /dev/null
++++ b/audio/mixer_paths.xml
+@@ -0,0 +1,564 @@
++<?xml version="1.0" encoding="ISO-8859-1"?>
++
++<mixer>
++    <!-- These are the initial mixer settings -->
++    <!-- NOTE: For all the mixer controls added under usecases or sound devices -->
++    <!--       we should have an initial mixer setting (default value) -->
++    <ctl name="TTY Mode" value="OFF" />
++    <ctl name="DAC1 Switch" value="0" />
++    <ctl name="EAR PA Gain" value="POS_6_DB" />
++    <ctl name="AUX_PCM_RX Audio Mixer MultiMedia1" value="0" />
++    <ctl name="AUX_PCM_RX Audio Mixer MultiMedia5" value="0" />
++    <ctl name="AUX_PCM_RX_Voice Mixer CSVoice" value="0" />
++    <ctl name="AUX_PCM_RX_Voice Mixer Voip" value="0" />
++    <ctl name="MultiMedia1 Mixer AFE_PCM_TX" value="0" />
++    <ctl name="MultiMedia1 Mixer AUX_PCM_UL_TX" value="0" />
++    <ctl name="MultiMedia1 Mixer INTERNAL_FM_TX" value="0" />
++    <ctl name="MultiMedia1 Mixer PRI_TX" value="0" />
++    <ctl name="MultiMedia1 Mixer VOC_REC_UL" value="0" />
++    <ctl name="MultiMedia1 Mixer VOC_REC_DL" value="0" />
++    <ctl name="MultiMedia5 Mixer AFE_PCM_TX" value="0" />
++    <ctl name="MultiMedia5 Mixer AUX_PCM_UL_TX" value="0" />
++    <ctl name="MultiMedia5 Mixer PRI_TX" value="0" />
++    <ctl name="HDMI Mixer MultiMedia1" value="0" />
++    <ctl name="HDMI Mixer MultiMedia2" value="0" />
++    <ctl name="HDMI Mixer MultiMedia5" value="0" />
++    <ctl name="HDMI_RX_Voice Mixer CSVoice" value="0" />
++    <ctl name="PRI_I2S_RX Port Mixer INTERNAL_FM_TX" value="0" />
++    <ctl name="PRI_RX Audio Mixer MultiMedia1" value="0" />
++    <ctl name="PRI_RX Audio Mixer MultiMedia5" value="0" />
++    <ctl name="PRI_RX_Voice Mixer CSVoice" value="0" />
++    <ctl name="PRI_RX_Voice Mixer Voip" value="0" />
++    <ctl name="PRI_RX Channels" value="One" />
++    <ctl name="PRI_TX Channels" value="One" />
++    <ctl name="SLIM TX7 MUX" value="ZERO" />
++    <ctl name="SLIM TX8 MUX" value="ZERO" />
++    <ctl name="DEC3 MUX" value="ZERO" />
++    <ctl name="DEC4 MUX" value="ZERO" />
++    <ctl name="DEC5 MUX" value="ZERO" />
++    <ctl name="DEC7 MUX" value="ZERO" />
++    <ctl name="DEC8 MUX" value="ZERO" />
++    <ctl name="RX1 MIX1 INP1" value="ZERO" />
++    <ctl name="RX2 MIX1 INP1" value="ZERO" />
++    <ctl name="RX5 MIX1 INP1" value="ZERO" />
++    <ctl name="RX5 MIX1 INP2" value="ZERO" />
++    <ctl name="HPHL DAC Switch" value="0" />
++    <ctl name="HPHR DAC Switch" value="0" />
++    <ctl name="Voice_Tx Mixer PRI_TX_Voice" value="0" />
++    <ctl name="Voice_Tx Mixer AUX_PCM_TX_Voice" value="0" />
++    <ctl name="Voip_Tx Mixer PRI_TX_Voip" value="0" />
++    <ctl name="Voip_Tx Mixer AUX_PCM_TX_Voip" value="0" />
++    <ctl name="AFE_PCM_RX Audio Mixer MultiMedia1" value="0" />
++    <ctl name="AFE_PCM_RX Audio Mixer MultiMedia2" value="0" />
++    <ctl name="AFE_PCM_RX Audio Mixer MultiMedia5" value="0" />
++    <ctl name="AFE_PCM_RX Port Mixer INTERNAL_FM_TX" value="0" />
++    <ctl name="TX3 HPF cut off" value="MIN_3DB_4Hz" />
++    <ctl name="TX4 HPF cut off" value="MIN_3DB_4Hz" />
++    <ctl name="TX5 HPF cut off" value="MIN_3DB_4Hz" />
++    <ctl name="MICBIAS1 CAPLESS Switch" value="0" />
++    <ctl name="PCM_RX_DL_HL Switch" value="0" />
++    <ctl name="SLIMBUS_DL_HL Switch" value="0" />
++    <ctl name="RX6 DSM MUX" value="CIC_OUT" />
++
++    <!-- echo reference -->
++    <ctl name="EC_REF_RX" value="NONE" />
++    <!-- echo reference end -->
++
++    <!-- These are audio route (FE to BE) specific mixer settings -->
++    <path name="deep-buffer-playback">
++        <ctl name="PRI_RX Audio Mixer MultiMedia1" value="1" />
++    </path>
++
++    <path name="deep-buffer-playback hdmi">
++        <ctl name="HDMI Mixer MultiMedia1" value="1" />
++    </path>
++
++    <path name="deep-buffer-playback speaker-and-hdmi">
++        <path name="deep-buffer-playback hdmi" />
++        <path name="deep-buffer-playback" />
++    </path>
++
++    <path name="deep-buffer-playback bt-sco">
++        <ctl name="AUX_PCM_RX Audio Mixer MultiMedia1" value="1" />
++    </path>
++
++    <path name="deep-buffer-playback afe-proxy">
++        <ctl name="AFE_PCM_RX Audio Mixer MultiMedia1" value="1" />
++    </path>
++
++    <path name="deep-buffer-playback usb-headphones">
++        <path name="deep-buffer-playback afe-proxy" />
++    </path>
++
++    <path name="deep-buffer-playback speaker-and-usb-headphones">
++        <path name="deep-buffer-playback usb-headphones" />
++        <path name="deep-buffer-playback" />
++    </path>
++
++    <path name="low-latency-playback">
++        <ctl name="PRI_RX Audio Mixer MultiMedia5" value="1" />
++    </path>
++
++    <path name="low-latency-playback hdmi">
++        <ctl name="HDMI Mixer MultiMedia5" value="1" />
++    </path>
++
++    <path name="low-latency-playback speaker-and-hdmi">
++        <path name="low-latency-playback hdmi" />
++        <path name="low-latency-playback" />
++    </path>
++
++    <path name="low-latency-playback bt-sco">
++        <ctl name="AUX_PCM_RX Audio Mixer MultiMedia5" value="1" />
++    </path>
++
++    <path name="low-latency-playback afe-proxy">
++        <ctl name="AFE_PCM_RX Audio Mixer MultiMedia5" value="1" />
++    </path>
++
++    <path name="low-latency-playback usb-headphones">
++        <path name="low-latency-playback afe-proxy" />
++    </path>
++
++    <path name="low-latency-playback speaker-and-usb-headphones">
++        <path name="low-latency-playback usb-headphones" />
++        <path name="low-latency-playback" />
++    </path>
++
++    <path name="multi-channel-playback hdmi">
++        <ctl name="HDMI Mixer MultiMedia2" value="1" />
++    </path>
++
++    <path name="multi-channel-playback afe-proxy">
++        <ctl name="AFE_PCM_RX Audio Mixer MultiMedia2" value="1" />
++    </path>
++
++    <path name="audio-record">
++        <ctl name="MultiMedia1 Mixer PRI_TX" value="1" />
++    </path>
++
++    <path name="audio-record bt-sco">
++        <ctl name="MultiMedia1 Mixer AUX_PCM_UL_TX" value="1" />
++    </path>
++
++    <path name="audio-record usb-headset-mic">
++        <ctl name="MultiMedia1 Mixer AFE_PCM_TX" value="1" />
++    </path>
++
++    <path name="audio-record capture-fm">
++        <ctl name="MultiMedia1 Mixer INTERNAL_FM_TX" value="1" />
++    </path>
++
++    <path name="low-latency-record">
++        <ctl name="MultiMedia5 Mixer PRI_TX" value="1" />
++    </path>
++
++    <path name="low-latency-record bt-sco">
++        <ctl name="MultiMedia5 Mixer AUX_PCM_UL_TX" value="1" />
++    </path>
++
++    <path name="low-latency-record usb-headset-mic">
++        <ctl name="MultiMedia5 Mixer AFE_PCM_TX" value="1" />
++    </path>
++
++    <path name="low-latency-record capture-fm">
++        <ctl name="MultiMedia5 Mixer INTERNAL_FM_TX" value="1" />
++    </path>
++
++    <path name="afe-proxy-playback afe-proxy">
++    </path>
++
++    <path name="afe-proxy-record afe-proxy">
++    </path>
++
++    <path name="voice-call">
++        <ctl name="PRI_RX_Voice Mixer CSVoice" value="1" />
++        <ctl name="Voice_Tx Mixer PRI_TX_Voice" value="1" />
++    </path>
++
++    <path name="voice-call hdmi">
++        <ctl name="HDMI_RX_Voice Mixer CSVoice" value="1" />
++        <ctl name="Voice_Tx Mixer PRI_TX_Voice" value="1" />
++    </path>
++
++    <path name="voice-call bt-sco">
++        <ctl name="AUX_PCM_RX_Voice Mixer CSVoice" value="1" />
++        <ctl name="Voice_Tx Mixer AUX_PCM_TX_Voice" value="1" />
++    </path>
++
++    <path name="voip-call">
++        <ctl name="PRI_RX_Voice Mixer Voip" value="1" />
++        <ctl name="Voip_Tx Mixer PRI_TX_Voip" value="1" />
++    </path>
++
++    <path name="voip-call bt-sco">
++        <ctl name="AUX_PCM_RX_Voice Mixer Voip" value="1" />
++        <ctl name="Voip_Tx Mixer AUX_PCM_TX_Voip" value="1" />
++    </path>
++
++    <path name="voice-call afe-proxy">
++        <ctl name="AFE_PCM_RX_Voice Mixer CSVoice" value="1" />
++        <ctl name="Voice_Tx Mixer AFE_PCM_TX_Voice" value="1" />
++    </path>
++
++    <path name="voice-call usb-headphones">
++        <path name="voice-call afe-proxy" />
++    </path>
++
++    <path name="incall-rec-uplink">
++        <ctl name="MultiMedia1 Mixer VOC_REC_UL" value="1" />
++    </path>
++
++    <path name="incall-rec-uplink bt-sco">
++        <path name="incall-rec-uplink" />
++    </path>
++
++    <path name="incall-rec-uplink usb-headset-mic">
++        <path name="incall-rec-uplink" />
++    </path>
++
++    <path name="incall-rec-uplink afe-proxy">
++        <path name="incall-rec-uplink" />
++    </path>
++
++    <path name="incall-rec-downlink">
++        <ctl name="MultiMedia1 Mixer VOC_REC_DL" value="1" />
++    </path>
++
++    <path name="incall-rec-downlink bt-sco">
++        <path name="incall-rec-downlink" />
++    </path>
++
++    <path name="incall-rec-downlink usb-headset-mic">
++        <path name="incall-rec-downlink" />
++    </path>
++
++    <path name="incall-rec-downlink afe-proxy">
++        <path name="incall-rec-downlink" />
++    </path>
++
++    <path name="incall-rec-uplink-and-downlink">
++        <path name="incall-rec-uplink" />
++        <path name="incall-rec-downlink" />
++    </path>
++
++    <path name="incall-rec-uplink-and-downlink bt-sco">
++        <path name="incall-rec-uplink-and-downlink" />
++    </path>
++
++    <path name="incall-rec-uplink-and-downlink usb-headset-mic">
++        <path name="incall-rec-uplink-and-downlink" />
++    </path>
++
++    <path name="incall-rec-uplink-and-downlink afe-proxy">
++        <path name="incall-rec-uplink-and-downlink" />
++    </path>
++
++    <!-- These are actual sound device specific mixer settings -->
++    <path name="adc2">
++        <ctl name="PRI_TX Channels" value="One" />
++        <ctl name="SLIM TX7 MUX" value="DEC5" />
++        <ctl name="DEC5 MUX" value="ADC2" />
++    </path>
++
++    <path name="adc3">
++        <ctl name="PRI_TX Channels" value="One" />
++        <ctl name="SLIM TX7 MUX" value="DEC4" />
++        <ctl name="DEC4 MUX" value="ADC3" />
++    </path>
++
++    <path name="adc4">
++        <ctl name="PRI_TX Channels" value="One" />
++        <ctl name="SLIM TX7 MUX" value="DEC3" />
++        <ctl name="DEC3 MUX" value="ADC4" />
++    </path>
++
++    <path name="spk">
++        <ctl name="PRI_RX Channels" value="Two" />
++        <ctl name="RX5 MIX1 INP1" value="RX1" />
++        <ctl name="RX5 MIX1 INP2" value="RX2" />
++        <ctl name="RX6 DSM MUX" value="DSM_INV" />
++    </path>
++
++    <path name="speaker">
++        <path name="spk" />
++        <ctl name="LINEOUT2 Volume" value="12" />
++        <ctl name="LINEOUT4 Volume" value="12" />
++        <ctl name="RX5 Digital Volume" value="84" />
++    </path>
++
++    <path name="speaker-mic">
++        <path name="adc4" />
++        <ctl name="ADC4 Volume" value="3" />
++        <ctl name="DEC3 Volume" value="84" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="handset">
++        <ctl name="PRI_RX Channels" value="One" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="EAR PA Gain" value="POS_6_DB" />
++        <ctl name="DAC1 Switch" value="1" />
++        <ctl name="RX1 Digital Volume" value="86" />
++    </path>
++
++    <path name="handset-mic">
++        <path name="adc3" />
++        <ctl name="ADC3 Volume" value="3" />
++        <ctl name="DEC4 Volume" value="84" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++	
++    <path name="dmic-endfire">
++        <ctl name="PRI_TX Channels" value="Two" />
++        <ctl name="SLIM TX8 MUX" value="DEC3" />
++        <ctl name="DEC3 MUX" value="ADC4" />
++        <ctl name="ADC4 Volume" value="3" />
++        <ctl name="SLIM TX7 MUX" value="DEC4" />
++        <ctl name="DEC4 MUX" value="ADC3" />
++        <ctl name="ADC3 Volume" value="3" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="headphones">
++        <ctl name="PRI_RX Channels" value="Two" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="RX2 MIX1 INP1" value="RX2" />
++        <ctl name="HPHL DAC Switch" value="1" />
++        <ctl name="HPHR DAC Switch" value="1" />
++        <ctl name="HPHL Volume" value="12" />
++        <ctl name="HPHR Volume" value="12" />
++        <ctl name="RX1 Digital Volume" value="84" />
++        <ctl name="RX2 Digital Volume" value="84" />
++    </path>
++
++    <path name="headset-mic">
++        <path name="adc2" />
++        <ctl name="ADC2 Volume" value="3" />
++        <ctl name="DEC5 Volume" value="84" />
++    </path>
++
++    <path name="voice-handset">
++        <ctl name="PRI_RX Channels" value="One" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="EAR PA Gain" value="POS_6_DB" />
++        <ctl name="DAC1 Switch" value="1" />
++        <ctl name="RX1 Digital Volume" value="86" />
++    </path>
++
++    <path name="voice-handset-mic">
++        <path name="handset-mic" />
++        <ctl name="LINEOUT3 Volume" value="0" />
++        <ctl name="TX3 HPF cut off" value="MIN_3DB_150Hz" />
++        <ctl name="TX4 HPF cut off" value="MIN_3DB_150Hz" />
++        <ctl name="TX5 HPF cut off" value="MIN_3DB_150Hz" />
++    </path>
++
++    <path name="voice-speaker">
++        <path name="spk" />
++        <ctl name="LINEOUT2 Volume" value="12" />
++        <ctl name="LINEOUT4 Volume" value="12" />
++        <ctl name="RX5 Digital Volume" value="86" />
++    </path>
++
++    <path name="voice-speaker-mic">
++        <path name="speaker-mic" />
++        <ctl name="TX3 HPF cut off" value="MIN_3DB_150Hz" />
++        <ctl name="TX4 HPF cut off" value="MIN_3DB_150Hz" />
++        <ctl name="TX5 HPF cut off" value="MIN_3DB_150Hz" />
++    </path>
++
++    <path name="voice-headphones">
++        <ctl name="PRI_RX Channels" value="Two" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="RX2 MIX1 INP1" value="RX2" />
++        <ctl name="HPHL DAC Switch" value="1" />
++        <ctl name="HPHR DAC Switch" value="1" />
++        <ctl name="HPHL Volume" value="12" />
++        <ctl name="HPHR Volume" value="12" />
++        <ctl name="RX1 Digital Volume" value="84" />
++        <ctl name="RX2 Digital Volume" value="84" />
++    </path>
++
++    <path name="voice-headset-mic">
++        <path name="headset-mic" />
++    </path>
++
++    <path name="speaker-and-headphones">
++        <ctl name="PRI_RX Channels" value="Two" />
++        <ctl name="RX5 MIX1 INP1" value="RX1" />
++        <ctl name="RX5 MIX1 INP2" value="RX2" />
++        <ctl name="RX6 DSM MUX" value="DSM_INV" />
++        <ctl name="LINEOUT2 Volume" value="12" />
++        <ctl name="LINEOUT4 Volume" value="12" />
++        <ctl name="RX5 Digital Volume" value="86" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="RX2 MIX1 INP1" value="RX2" />
++        <ctl name="HPHL DAC Switch" value="1" />
++        <ctl name="HPHR DAC Switch" value="1" />
++        <ctl name="HPHL Volume" value="0" />
++        <ctl name="HPHR Volume" value="0" />
++        <ctl name="RX1 Digital Volume" value="70" />
++        <ctl name="RX2 Digital Volume" value="70" />
++    </path>
++
++    <path name="voip-handset-comm">
++        <ctl name="PRI_RX Channels" value="One" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="EAR PA Gain" value="POS_6_DB" />
++        <ctl name="DAC1 Switch" value="1" />
++        <ctl name="RX1 Digital Volume" value="92" />
++    </path>
++
++    <path name="voip-speaker-comm">
++        <path name="spk" />
++        <ctl name="LINEOUT2 Volume" value="12" />
++        <ctl name="LINEOUT4 Volume" value="12" />
++        <ctl name="RX5 Digital Volume" value="86" />
++    </path>
++
++    <path name="voip-headset-comm">
++        <ctl name="PRI_RX Channels" value="Two" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="RX2 MIX1 INP1" value="RX2" />
++        <ctl name="HPHL DAC Switch" value="1" />
++        <ctl name="HPHR DAC Switch" value="1" />
++        <ctl name="RX1 Digital Volume" value="84" />
++        <ctl name="RX2 Digital Volume" value="84" />
++        <ctl name="HPHL Volume" value="6" />
++        <ctl name="HPHR Volume" value="6" />
++    </path>
++
++    <path name="voip-main-mic-comm">
++        <path name="adc4" />
++        <ctl name="ADC4 Volume" value="3" />
++        <ctl name="DEC3 Volume" value="84" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="voip-sub-mic-comm">
++        <path name="adc4" />
++        <ctl name="ADC4 Volume" value="3" />
++        <ctl name="DEC3 Volume" value="84" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="voip-headset-mic-comm">
++        <path name="adc2" />
++        <ctl name="ADC2 Volume" value="3" />
++        <ctl name="DEC5 Volume" value="84" />
++    </path>
++
++    <path name="hdmi">
++    </path>
++
++    <path name="speaker-and-hdmi">
++        <path name="speaker" />
++        <path name="hdmi" />
++    </path>
++
++    <path name="usb-headphones">
++    </path>
++
++    <path name="speaker-and-usb-headphones">
++        <path name="speaker" />
++        <path name="usb-headphones" />
++    </path>
++
++    <path name="afe-proxy">
++    </path>
++
++    <path name="capture-fm">
++    </path>
++
++    <path name="voice-rec-mic">
++        <path name="adc3" />
++        <ctl name="ADC3 Volume" value="3" />
++        <ctl name="DEC4 Volume" value="84" />
++    </path>
++
++    <path name="camcorder-mic">
++        <ctl name="PRI_TX Channels" value="Two" />
++        <ctl name="SLIM TX7 MUX" value="DEC3" />
++        <ctl name="DEC3 MUX" value="ADC4" />
++        <ctl name="ADC4 Volume" value="3" />
++        <ctl name="DEC3 Volume" value="105" />
++        <ctl name="SLIM TX8 MUX" value="DEC4" />
++        <ctl name="DEC4 MUX" value="ADC3" />
++        <ctl name="ADC3 Volume" value="3" />
++        <ctl name="DEC4 Volume" value="105" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="hdmi-mic">
++        <ctl name="PRI_TX Channels" value="One" />
++    </path>
++
++    <path name="bt-sco-headset">
++    </path>
++
++    <path name="bt-sco-mic">
++    </path>
++
++    <path name="usb-headset-mic">
++    </path>
++
++    <!-- TTY devices -->
++    <path name="tty-headphones">
++        <ctl name="PRI_RX Channels" value="One" />
++        <ctl name="RX1 MIX1 INP1" value="RX1" />
++        <ctl name="HPHL DAC Switch" value="1" />
++        <ctl name="HPHL Volume" value="10" />
++    </path>
++
++    <path name="voice-tty-full-headphones">
++        <ctl name="TTY Mode" value="FULL" />
++        <path name="tty-headphones" />
++    </path>
++
++    <path name="voice-tty-vco-headphones">
++        <ctl name="TTY Mode" value="VCO" />
++        <path name="tty-headphones" />
++    </path>
++
++    <path name="voice-tty-hco-handset">
++        <ctl name="TTY Mode" value="HCO" />
++        <path name="handset" />
++    </path>
++
++    <path name="voice-tty-full-headset-mic">
++        <ctl name="PRI_TX Channels" value="One" />
++        <ctl name="SLIM TX7 MUX" value="DEC8" />
++        <ctl name="DEC8 MUX" value="ADC2" />
++        <ctl name="ADC2 Volume" value="1" />
++    </path>
++
++    <path name="voice-tty-hco-headset-mic">
++        <path name="voice-tty-full-headset-mic" />
++    </path>
++
++    <path name="voice-tty-vco-handset-mic">
++        <ctl name="PRI_TX Channels" value="One" />
++        <ctl name="SLIM TX7 MUX" value="DEC7" />
++        <ctl name="DEC7 MUX" value="DMIC1" />
++        <ctl name="MICBIAS1 CAPLESS Switch" value="1" />
++    </path>
++
++    <path name="play-fm">
++        <ctl name="Internal FM RX Volume" value="1" />
++        <ctl name="PRI_RX Port Mixer INTERNAL_FM_TX" value="1" />
++        <ctl name="SLIMBUS_DL_HL Switch" value="1" />
++    </path>
++
++    <path name="play-fm usb-headphones">
++        <ctl name="Internal FM RX Volume" value="1" />
++        <ctl name="AFE_PCM_RX Port Mixer INTERNAL_FM_TX" value="1" />
++        <ctl name="PCM_RX_DL_HL Switch" value="1" />
++    </path>
++
++    <path name="voice-rx">
++    </path>
++
++    <path name="voice-tx">
++    </path>
++</mixer>
+diff --git a/audio/snd_soc_msm_2x b/audio/snd_soc_msm_2x
+deleted file mode 100644
+index f8b79f1..0000000
+--- a/audio/snd_soc_msm_2x
++++ /dev/null
+@@ -1,7403 +0,0 @@
+-# Master file for snd_soc_msm tabla 2.0 sound card
+-# Lists all use case verbs
+-SectionUseCase."HiFi" {
+-Comment "Music playback use case"
+-SectionVerb
+-	Name "HiFi"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSpeaker FM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiFM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiHDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiHDMI SPDIF"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia1':1:1
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia1':1:0
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiBT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiBT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiUSB PROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiUSB PROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiSPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFiPROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-}
+-SectionUseCase."HiFi2" {
+-Comment "Music playback use case for MM2 FE"
+-SectionVerb
+-	Name "HiFi2"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2Speaker FM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2FM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2HDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2HDMI SPDIF"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia2':1:1
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia2':1:0
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2BT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2BT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi2SPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi2PROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-}
+-SectionUseCase."HiFi Low Power" {
+-Comment "LPA use case"
+-SectionVerb
+-	Name "HiFi Low Power"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerSpeaker FM Tx"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerFM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerHDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerBT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerBT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerUSB PROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Low PowerPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-                'PRI_RX Audio Mixer MultiMedia3':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-                'PRI_RX Audio Mixer MultiMedia3':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi Low PowerDock"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFiDock"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-}
+-SectionUseCase."HiFi Rec" {
+-Comment "Recording use case"
+-SectionVerb
+-	Name "HiFi Rec"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi RecBT SCO Tx"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi RecBT SCO WB Tx"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi RecPROXY Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi RecUSB PROXY Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi RecPROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi RecUSB PROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi RecSSR QMIC"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-}
+-SectionUseCase."Voice Call" {
+-Comment "Voice Call use case"
+-SectionVerb
+-	Name "Voice Call"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer PRI_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer PRI_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallHDMI"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer PRI_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallHDMI Tx"
+-
+-	EnableSequence
+-		'HDMI_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer PRI_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallBT SCO Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallBT SCO Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallBT SCO WB Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallBT SCO WB Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallPROXY Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AFE_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice CallPROXY Tx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AFE_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-}
+-SectionUseCase."SGLTE" {
+-Comment "SGLTE use case"
+-SectionVerb
+-        Name "SGLTE"
+-
+-        EnableSequence
+-                'PRI_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallHDMI"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallHDMI Tx"
+-
+-        EnableSequence
+-                'HDMI_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallBT SCO Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer AUX_PCM_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallBT SCO Tx"
+-
+-        EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer AUX_PCM_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallBT SCO WB Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer AUX_PCM_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallBT SCO WB Tx"
+-
+-        EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-                'AUX_PCM_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer AUX_PCM_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallPROXY Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer AFE_PCM_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-
+-SectionVerb
+-        Name "SGLTE CallPROXY Tx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer AFE_PCM_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 13
+-        CapturePCM 13
+-
+-EndSection
+-}
+-SectionUseCase."Voice Call IP" {
+-Comment "VOIP Call use case"
+-SectionVerb
+-	Name "Voice Call IP"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer PRI_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer PRI_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPHDMI Tx"
+-
+-	EnableSequence
+-		'HDMI_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer PRI_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPBT SCO Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer AUX_PCM_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPBT SCO Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:1
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-        Name "Voice Call IPBT SCO WB Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:0
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 3
+-        CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-        Name "Voice Call IPBT SCO WB Tx"
+-
+-        EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:1
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 3
+-        CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPHDMI"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer PRI_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPFM Tx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer PRI_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPROXY Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer AFE_PCM_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionVerb
+-	Name "Voice Call IPPROXY Tx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer AFE_PCM_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-}
+-SectionUseCase."FM Digital Radio" {
+-Comment "FM Radio use case"
+-SectionVerb
+-	Name "FM Digital Radio"
+-
+-	EnableSequence
+-		'Internal FM RX Volume':1:0
+-		'PRI_RX Port Mixer INTERNAL_FM_TX':1:1
+-		'SLIMBUS_DL_HL Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Port Mixer INTERNAL_FM_TX':1:0
+-		'SLIMBUS_DL_HL Switch':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 5
+-	CapturePCM 6
+-
+-EndSection
+-
+-SectionVerb
+-	Name "FM Digital RadioPROXY Rx"
+-
+-	EnableSequence
+-		'Internal FM RX Volume':1:0
+-		'AFE_PCM_RX Port Mixer INTERNAL_FM_TX':1:1
+-		'PCM_RX_DL_HL Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX Port Mixer INTERNAL_FM_TX':1:0
+-		'PCM_RX_DL_HL Switch':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 5
+-	CapturePCM 6
+-
+-EndSection
+-
+-SectionVerb
+-	Name "FM Digital RadioPROXY Tx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 5
+-	CapturePCM 6
+-
+-EndSection
+-}
+-SectionUseCase."FM REC" {
+-Comment "FM Recording use case"
+-SectionVerb
+-	Name "FM REC"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer INTERNAL_FM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer INTERNAL_FM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 0
+-	CapturePCM 0
+-
+-EndSection
+-}
+-SectionUseCase."FM A2DP REC" {
+-Comment "FM A2DP playback use case"
+-SectionVerb
+-	Name "FM A2DP REC"
+-
+-	EnableSequence
+-		'MultiMedia2 Mixer INTERNAL_FM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia2 Mixer INTERNAL_FM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 1
+-	CapturePCM 1
+-
+-EndSection
+-}
+-SectionUseCase."DL REC" {
+-Comment "Voice Downlink Recording use case"
+-SectionVerb
+-	Name "DL REC"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer VOC_REC_DL':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer VOC_REC_DL':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 0
+-	CapturePCM 0
+-
+-EndSection
+-}
+-SectionUseCase."UL DL REC" {
+-Comment "Voice Uplink Downlink Recording use case"
+-SectionVerb
+-	Name "UL DL REC"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer VOC_REC_UL':1:1
+-		'MultiMedia1 Mixer VOC_REC_DL':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer VOC_REC_UL':1:0
+-		'MultiMedia1 Mixer VOC_REC_DL':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 0
+-	CapturePCM 0
+-
+-EndSection
+-}
+-SectionUseCase."HiFi Tunnel" {
+-Comment "Tunnel mode playback use case"
+-SectionVerb
+-	Name "HiFi Tunnel"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSpeaker FM Tx"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelFM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelHDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelHDMI SPDIF"
+-
+-        EnableSequence
+-                'HDMI Mixer MultiMedia4':1:1
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI Mixer MultiMedia4':1:0
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelBT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelBT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-	Name "HiFi TunnelSPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi TunnelPROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-}
+-SectionUseCase."MI2S" {
+-Comment "MI2S use case"
+-
+-SectionVerb
+-        Name "MI2S"
+-
+-        EnableSequence
+-                'PRI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 5
+-
+-EndSection
+-
+-SectionVerb
+-        Name "MI2SSpeaker"
+-
+-        EnableSequence
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-                'SLIMBUS_DL_HL Switch':1:1
+-                'PRI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-                'SLIMBUS_DL_HL Switch':1:0
+-                'PRI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 5
+-
+-EndSection
+-
+-SectionVerb
+-        Name "MI2SHDMI"
+-
+-        EnableSequence
+-                'HDMI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 11
+-
+-EndSection
+-
+-SectionVerb
+-        Name "MI2SSPDIF"
+-
+-        EnableSequence
+-                'SEC_I2S_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'SEC_I2S_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 13
+-
+-EndSection
+-
+-}
+-SectionUseCase."VoLTE" {
+-Comment "VoLTE use case"
+-SectionVerb
+-	Name "VoLTE"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer VoLTE':1:1
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer VoLTE':1:0
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallHDMI"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI_RX_Voice Mixer VoLTE':1:0
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallHDMI Tx"
+-
+-	EnableSequence
+-		'HDMI_RX_Voice Mixer VoLTE':1:1
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallBT SCO Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer VoLTE':1:0
+-		'VoLTE_Tx Mixer AUX_PCM_TX_VoLTE':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallBT SCO Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer VoLTE':1:1
+-		'VoLTE_Tx Mixer AUX_PCM_TX_VoLTE':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallBT SCO WB Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer VoLTE':1:0
+-		'VoLTE_Tx Mixer AUX_PCM_TX_VoLTE':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionVerb
+-	Name "VoLTE CallBT SCO WB Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-		'AUX_PCM_RX_Voice Mixer VoLTE':1:1
+-		'VoLTE_Tx Mixer AUX_PCM_TX_VoLTE':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-}
+-SectionUseCase."ADSP testfwk" {
+-Comment "ADSP testfwk use case"
+-
+-SectionVerb
+-        Name "ADSP testfwk"
+-
+-        EnableSequence
+-		'SLIMBUS_DL_HL Switch':1:1
+-        EndSequence
+-
+-        DisableSequence
+-		'SLIMBUS_DL_HL Switch':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 5
+-        CapturePCM 5
+-
+-EndSection
+-}
+-
+-SectionUseCase."HiFi Lowlatency" {
+-Comment "LowLatnecy mode playback use case"
+-SectionVerb
+-        Name "HiFi Lowlatency"
+-
+-        EnableSequence
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-        CapturePCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencySpeaker FM Tx"
+-
+-        EnableSequence
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-                'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-                'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyFM Tx"
+-
+-        EnableSequence
+-                'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyHDMI"
+-
+-        EnableSequence
+-                'HDMI Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyHDMI Speaker"
+-
+-        EnableSequence
+-                'HDMI Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyBT SCO Rx"
+-
+-        EnableSequence
+-                'INTERNAL_BT_SCO_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'INTERNAL_BT_SCO_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-
+-SectionVerb
+-        Name "HiFi LowlatencyBT SCO WB Rx"
+-
+-        EnableSequence
+-                'INTERNAL_BT_SCO_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'INTERNAL_BT_SCO_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyUSB PROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Tx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi LowlatencyPROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 14
+-
+-EndSection
+-}
+-SectionUseCase."HiFi Lowlatency Rec" {
+-Comment "Recording use case"
+-SectionVerb
+-        Name "HiFi Lowlatency Rec"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecBT SCO Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-SectionVerb
+-        Name "HiFi Lowlatency RecBT SCO WB Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecPROXY Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecPROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecUSB PROXY Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecUSB PROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionVerb
+-        Name "HiFi Lowlatency RecSSR QMIC"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 10
+-        PlaybackPCM 10
+-
+-EndSection
+-}
+-
+-SectionDevice
+-	Name "Earpiece"
+-	Comment "Handset Rx device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:One
+-        'RX1 MIX1 INP1':0:RX1
+-        'EAR PA Gain':0:POS_6_DB
+-        'DAC1 Switch':1:1
+-        'RX1 Digital Volume':1:74%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'DAC1 Switch':1:0
+-        'EAR PA Gain':0:ZERO
+-        'RX1 Digital Volume':1:0
+-    EndSequence
+-
+-	ACDBID	7:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Earpiece"
+-    Comment "Handset Rx device for voice call"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:One
+-        'RX1 MIX1 INP1':0:RX1
+-        'EAR PA Gain':0:POS_6_DB
+-        'DAC1 Switch':1:1
+-        'RX1 Digital Volume':1:74%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'DAC1 Switch':1:0
+-        'EAR PA Gain':0:ZERO
+-        'RX1 Digital Volume':1:0
+-    EndSequence
+-
+-    ACDBID  7:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Earpiece"
+-    Comment "Handset Rx device for VOIP call"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:One
+-        'RX1 MIX1 INP1':0:RX1
+-        'EAR PA Gain':0:POS_6_DB
+-        'DAC1 Switch':1:1
+-        'RX1 Digital Volume':1:74%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'DAC1 Switch':1:0
+-        'EAR PA Gain':0:ZERO
+-        'RX1 Digital Volume':1:0
+-    EndSequence
+-
+-    ACDBID  7:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Voice Earpiece Extra Gain"
+-	Comment "Handset Rx device for voice call with extra gain"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'EAR PA Gain':0:POS_6_DB
+-		'DAC1 Switch':1:1
+-		'RX1 Digital Volume':1:74%
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'DAC1 Switch':1:0
+-		'EAR PA Gain':0:ZERO
+-		'RX1 Digital Volume':1:0
+-	EndSequence
+-
+-	ACDBID	71:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Handset Rx"
+-	Comment "TTY HCO Handset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'EAR PA Gain':0:POS_2_DB
+-		'DAC1 Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'DAC1 Switch':1:0
+-	EndSequence
+-
+-	ACDBID  37:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "ANC Handset"
+-	Comment "ANC Handset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'DAC1 Switch':1:1
+-                'ANC Slot':1:1
+-                'ANC1 MUX':0:DMIC1
+-                'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'DAC1 Switch':1:0
+-                'ANC Slot':1:0
+-                'ANC1 MUX':0:ZERO
+-                'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	30:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Speaker"
+-	Comment "Speaker Rx device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX5 MIX1 INP1':0:RX1
+-        'RX5 MIX1 INP2':0:RX2
+-        'RX6 DSM MUX':0:DSM_INV
+-        'LINEOUT2 Volume':1:100%
+-        'LINEOUT4 Volume':1:100%
+-        'RX5 Digital Volume':1:70%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX5 MIX1 INP1':0:ZERO
+-        'RX5 MIX1 INP2':0:ZERO
+-        'LINEOUT2 Volume':1:0
+-        'LINEOUT4 Volume':1:0
+-        'RX5 Digital Volume':1:0
+-    EndSequence
+-
+-	ACDBID	15:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Speaker"
+-    Comment "Speaker Rx device for voice call"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX5 MIX1 INP1':0:RX1
+-        'RX5 MIX1 INP2':0:RX2
+-        'RX6 DSM MUX':0:DSM_INV
+-        'LINEOUT2 Volume':1:100%
+-        'LINEOUT4 Volume':1:100%
+-        'RX5 Digital Volume':2:70%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX5 MIX1 INP1':0:ZERO
+-        'RX5 MIX1 INP2':0:ZERO
+-        'LINEOUT2 Volume':1:0
+-        'LINEOUT4 Volume':1:0
+-        'RX5 Digital Volume':1:65%
+-    EndSequence
+-
+-    ACDBID  15:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Speaker"
+-    Comment "VoIP Comm Speaker Rx device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX5 MIX1 INP1':0:RX1
+-        'RX5 MIX1 INP2':0:RX2
+-        'RX6 DSM MUX':0:DSM_INV
+-        'LINEOUT2 Volume':1:100%
+-        'LINEOUT4 Volume':1:100%
+-        'RX5 Digital Volume':1:70%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX5 MIX1 INP1':0:ZERO
+-        'RX5 MIX1 INP2':0:ZERO
+-        'LINEOUT2 Volume':1:0
+-        'LINEOUT4 Volume':1:0
+-        'RX5 Digital Volume':1:0
+-    EndSequence
+-
+-    ACDBID  15:1
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Sub Mic"
+-    Comment "Sub Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'DEC3 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-        'TX3 HPF cut off':0:MIN_3DB_150Hz
+-        'TX4 HPF cut off':0:MIN_3DB_150Hz
+-        'TX5 HPF cut off':0:MIN_3DB_150Hz
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-        'TX3 HPF cut off':0:MIN_3DB_4Hz
+-        'TX4 HPF cut off':0:MIN_3DB_4Hz
+-        'TX5 HPF cut off':0:MIN_3DB_4Hz
+-    EndSequence
+-
+-    ACDBID  11:2
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Headphones"
+-	Comment "Headset Rx device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX1 MIX1 INP1':0:RX1
+-        'RX2 MIX1 INP1':0:RX2
+-        'HPHL DAC Switch':1:1
+-        'HPHR DAC Switch':1:1
+-        'HPHL Volume':1:100%
+-        'HPHR Volume':1:100%
+-        'RX1 Digital Volume':2:67.7%
+-        'RX2 Digital Volume':2:67.7%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'RX2 MIX1 INP1':0:ZERO
+-        'HPHL DAC Switch':1:0
+-        'HPHR DAC Switch':1:0
+-        'HPHL Volume':1:0
+-        'HPHR Volume':1:0
+-        'RX1 Digital Volume':1:0
+-        'RX2 Digital Volume':1:0
+-    EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Headphones"
+-    Comment "Headset Rx device for voice call"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX1 MIX1 INP1':0:RX1
+-        'RX2 MIX1 INP1':0:RX2
+-        'HPHL DAC Switch':1:1
+-        'HPHR DAC Switch':1:1
+-        'HPHL Volume':1:100%
+-        'HPHR Volume':1:100%
+-        'RX1 Digital Volume':2:67.7%
+-        'RX2 Digital Volume':2:67.7%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'RX2 MIX1 INP1':0:ZERO
+-        'HPHL DAC Switch':1:0
+-        'HPHR DAC Switch':1:0
+-        'HPHL Volume':1:0
+-        'HPHR Volume':1:0
+-        'RX1 Digital Volume':1:0
+-        'RX2 Digital Volume':1:0
+-    EndSequence
+-
+-    ACDBID  10:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Headphones"
+-    Comment "VoIP Comm Headset Rx device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX1 MIX1 INP1':0:RX1
+-        'RX2 MIX1 INP1':0:RX2
+-        'HPHL DAC Switch':1:1
+-        'HPHR DAC Switch':1:1
+-        'RX1 Digital Volume':2:67.7%
+-        'RX2 Digital Volume':2:67.7%
+-        'HPHL Volume':1:50%
+-        'HPHR Volume':1:50%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX1 MIX1 INP1':0:ZERO
+-        'RX2 MIX1 INP1':0:ZERO
+-        'HPHL DAC Switch':1:0
+-        'HPHR DAC Switch':1:0
+-        'RX1 Digital Volume':1:0
+-        'RX2 Digital Volume':1:0
+-        'HPHL Volume':1:100%
+-        'HPHR Volume':1:100%
+-    EndSequence
+-
+-    ACDBID  10:1
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Speaker Headset"
+-	Comment "Speaker Headset Rx combo device"
+-
+-    EnableSequence
+-        'PRI_RX Channels':0:Two
+-        'RX5 MIX1 INP1':0:RX1
+-        'RX5 MIX1 INP2':0:RX2
+-        'RX6 DSM MUX':0:DSM_INV
+-        'LINEOUT2 Volume':1:100%
+-        'LINEOUT4 Volume':1:100%
+-        'RX5 Digital Volume':1:70%
+-        'RX1 MIX1 INP1':0:RX1
+-        'RX2 MIX1 INP1':0:RX2
+-        'HPHL DAC Switch':1:1
+-        'HPHR DAC Switch':1:1
+-        'HPHL Volume':1:0%
+-        'HPHR Volume':1:0%
+-        'RX1 Digital Volume':2:56.4%
+-        'RX2 Digital Volume':2:56.4%
+-    EndSequence
+-
+-    DisableSequence
+-        'RX5 MIX1 INP1':0:ZERO
+-        'RX5 MIX1 INP2':0:ZERO
+-        'LINEOUT2 Volume':1:0
+-        'LINEOUT4 Volume':1:0
+-        'RX5 Digital Volume':1:0
+-        'RX1 MIX1 INP1':0:ZERO
+-        'RX2 MIX1 INP1':0:ZERO
+-        'HPHL DAC Switch':1:0
+-        'HPHR DAC Switch':1:0
+-        'HPHL Volume':1:0
+-        'HPHR Volume':1:0
+-        'RX1 Digital Volume':1:0
+-        'RX2 Digital Volume':1:0
+-    EndSequence
+-
+-    ACDBID  15:1
+-
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Speaker ANC Headset"
+-	Comment "Speaker ANC Headset Rx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-                'LINEOUT1 Volume':1:66
+-                'LINEOUT2 Volume':1:66
+-                'LINEOUT3 Volume':1:66
+-                'LINEOUT4 Volume':1:66
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-                'LINEOUT1 Volume':1:0
+-                'LINEOUT2 Volume':1:0
+-                'LINEOUT3 Volume':1:0
+-                'LINEOUT4 Volume':1:0
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "ANC Headset"
+-	Comment "ANC Headset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-
+-SectionDevice
+-	Name "Speaker FM Tx"
+-	Comment "Speaker FM Tx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-                'LINEOUT1 Volume':1:66
+-                'LINEOUT2 Volume':1:66
+-                'LINEOUT3 Volume':1:66
+-                'LINEOUT4 Volume':1:66
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-                'LINEOUT1 Volume':1:0
+-                'LINEOUT2 Volume':1:0
+-                'LINEOUT3 Volume':1:0
+-                'LINEOUT4 Volume':1:0
+-	EndSequence
+-
+-	ACDBID	15:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Headset"
+-	Comment "Headset Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC5
+-        'DEC5 MUX':0:ADC2
+-        'ADC2 Volume':1:100%
+-        'DEC5 Volume':2:67.7%
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC5 MUX':0:ZERO
+-        'ADC2 Volume':1:0
+-    EndSequence
+-
+-	ACDBID	8:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Headset"
+-    Comment "Call Headset Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC5
+-        'DEC5 MUX':0:ADC2
+-        'ADC2 Volume':1:100%
+-        'DEC5 Volume':2:67.7%
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC5 MUX':0:ZERO
+-        'ADC2 Volume':1:0
+-    EndSequence
+-
+-    ACDBID  8:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Headset"
+-    Comment "VoIP Comm Headset Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC5
+-        'DEC5 MUX':0:ADC2
+-        'ADC2 Volume':1:100%
+-        'DEC5 Volume':2:67.7%
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC5 MUX':0:ZERO
+-        'ADC2 Volume':1:0
+-    EndSequence
+-
+-    ACDBID  59:2
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Handset"
+-	Comment "Handset Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'DEC4 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  54:2
+-
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Camcorder Tx"
+-    Comment "Camcorder Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:Two
+-        'SLIM TX7 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'DEC3 Volume':1:85%
+-        'SLIM TX8 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100
+-        'DEC4 Volume':1:85%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'DEC3 Volume':1:67%
+-        'SLIM TX8 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'DEC4 Volume':1:67%
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  56:2
+-
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Handset Analog Tx"
+-	Comment "TTY Handset Analog Tx device"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC7
+-		'DEC7 MUX':0:ADC1
+-		'ADC1 Volume':1:100
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'ADC1 Volume':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID  36:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Line"
+-	Comment "Speaker Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'DEC4 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  54:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Line"
+-    Comment "Voice Speaker Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'DEC4 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-        'LINEOUT3 Volume':1:0%
+-        'TX3 HPF cut off':0:MIN_3DB_150Hz
+-        'TX4 HPF cut off':0:MIN_3DB_150Hz
+-        'TX5 HPF cut off':0:MIN_3DB_150Hz
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-        'TX3 HPF cut off':0:MIN_3DB_4Hz
+-        'TX4 HPF cut off':0:MIN_3DB_4Hz
+-        'TX5 HPF cut off':0:MIN_3DB_4Hz
+-    EndSequence
+-
+-    ACDBID  4:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Handset"
+-    Comment "VoIP Comm Main Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'DEC3 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  57:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "VOIP Line"
+-    Comment "VoIP Comm Main Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'DEC3 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  57:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Recognition"
+-    Comment "VR Main Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'DEC4 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  53:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Voice Recognition Headset"
+-    Comment "VR Headset Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:One
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'DEC4 Volume':2:67.7%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  8:2
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Handset Tx"
+-	Comment "TTY VCO Handset Tx device"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC7
+-		'DEC7 MUX':0:DMIC1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID  36:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "HDMI Tx"
+-	Comment "HDMI Tx device"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC7
+-		'DEC7 MUX':0:DMIC1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	4:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-
+-        Name "QMIC"
+-        Comment "Quad mic device"
+-
+-        EnableSequence
+-                'PRI_TX Channels':0:Four
+-                'SLIM TX7 MUX':0:DEC7
+-                'DEC7 MUX':0:DMIC1
+-                'SLIM TX8 MUX':0:DEC8
+-                'DEC8 MUX':0:DMIC2
+-                'SLIM TX9 MUX':0:DEC10
+-                'DEC10 MUX':0:DMIC3
+-                'SLIM TX10 MUX':0:DEC9
+-                'DEC9 MUX':0:DMIC4
+-                'MICBIAS1 CAPLESS Switch':1:1
+-                'MICBIAS3 CAPLESS Switch':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'SLIM TX7 MUX':0:ZERO
+-                'DEC7 MUX':0:ZERO
+-                'SLIM TX8 MUX':0:ZERO
+-                'DEC8 MUX':0:ZERO
+-                'SLIM TX9 MUX':0:ZERO
+-                'DEC9 MUX':0:ZERO
+-                'SLIM TX10 MUX':0:ZERO
+-                'DEC10 MUX':0:ZERO
+-                'MICBIAS1 CAPLESS Switch':1:0
+-                'MICBIAS3 CAPLESS Switch':1:0
+-        EndSequence
+-
+-        ACDBID  19:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "DMIC Broadside"
+-	Comment "Dual MIC Broadside Tx device"
+-
+-	EnableSequence
+-		'SLIM TX7 MUX':0:DEC7
+-		'DEC7 MUX':0:DMIC1
+-		'SLIM TX8 MUX':0:DEC8
+-		'DEC8 MUX':0:DMIC2
+-		'MICBIAS1 CAPLESS Switch':1:1
+-		'PRI_TX Channels':0:Two
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'SLIM TX8 MUX':0:ZERO
+-		'DEC8 MUX':0:ZERO
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	5:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "DMIC Endfire"
+-	Comment "Dual MIC Endfire Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:Two
+-        'SLIM TX8 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100%
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-        'TX3 HPF cut off':0:MIN_3DB_150Hz
+-        'TX4 HPF cut off':0:MIN_3DB_150Hz
+-        'TX5 HPF cut off':0:MIN_3DB_150Hz
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'SLIM TX8 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-        'TX3 HPF cut off':0:MIN_3DB_4Hz
+-        'TX4 HPF cut off':0:MIN_3DB_4Hz
+-        'TX5 HPF cut off':0:MIN_3DB_4Hz
+-    EndSequence
+-
+-    ACDBID  52:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Speaker DMIC Broadside"
+-	Comment "Dual MIC Broadside Tx device"
+-
+-	EnableSequence
+-		'SLIM TX7 MUX':0:DEC7
+-		'DEC7 MUX':0:DMIC1
+-		'SLIM TX8 MUX':0:DEC8
+-		'DEC8 MUX':0:DMIC2
+-		'MICBIAS1 CAPLESS Switch':1:1
+-		'PRI_TX Channels':0:Two
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'SLIM TX8 MUX':0:ZERO
+-		'DEC8 MUX':0:ZERO
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	12:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Speaker DMIC Endfire"
+-	Comment "Call Main Mic Tx device"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC4
+-		'DEC4 MUX':0:ADC3
+-		'ADC3 Volume':1:100%
+-		'DEC4 Volume':2:67.7%
+-		'MICBIAS1 CAPLESS Switch':1:1
+-		'LINEOUT3 Volume':1:0%
+-		'TX3 HPF cut off':0:MIN_3DB_150Hz
+-		'TX4 HPF cut off':0:MIN_3DB_150Hz
+-		'TX5 HPF cut off':0:MIN_3DB_150Hz
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC4 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-		'TX3 HPF cut off':0:MIN_3DB_4Hz
+-		'TX4 HPF cut off':0:MIN_3DB_4Hz
+-		'TX5 HPF cut off':0:MIN_3DB_4Hz
+-	EndSequence
+-
+-	ACDBID	4:2
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Speaker DMIC Stereo"
+-    Comment "Stereo Mic Tx device"
+-
+-    EnableSequence
+-        'PRI_TX Channels':0:Two
+-        'SLIM TX7 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'DEC3 Volume':1:87%
+-        'SLIM TX8 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100
+-        'DEC4 Volume':1:87%
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'DEC3 Volume':1:67%
+-        'SLIM TX8 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'DEC4 Volume':1:67%
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  56:2
+-
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "Handset DMIC Stereo"
+-    Comment "Stereo Mic Tx device"
+-    EnableSequence
+-        'PRI_TX Channels':0:Two
+-        'SLIM TX8 MUX':0:DEC3
+-        'DEC3 MUX':0:ADC4
+-        'ADC4 Volume':1:100
+-        'SLIM TX7 MUX':0:DEC4
+-        'DEC4 MUX':0:ADC3
+-        'ADC3 Volume':1:100
+-        'MICBIAS1 CAPLESS Switch':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM TX7 MUX':0:ZERO
+-        'DEC3 MUX':0:ZERO
+-        'ADC4 Volume':1:0
+-        'SLIM TX8 MUX':0:ZERO
+-        'DEC4 MUX':0:ZERO
+-        'ADC3 Volume':1:0
+-        'MICBIAS1 CAPLESS Switch':1:0
+-    EndSequence
+-
+-    ACDBID  56:2
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Headset Rx"
+-	Comment "TTY Headset Rx device"
+-
+-	EnableSequence
+-		'TTY Mode':0:VCO
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'HPHL DAC Switch':1:1
+-		'HPHL Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'TTY Mode':0:ZERO
+-		'RX1 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHL Volume':1:0
+-	EndSequence
+-
+-	ACDBID	17:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Headset Tx"
+-	Comment "TTY Headset Tx device"
+-
+-	EnableSequence
+-		'TTY Mode':0:HCO
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC8
+-		'DEC8 MUX':0:ADC2
+-		'ADC2 Volume':1:100
+-	EndSequence
+-
+-	DisableSequence
+-		'TTY Mode':0:ZERO
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC8 MUX':0:ZERO
+-		'ADC2 Volume':1:0
+-	EndSequence
+-
+-	ACDBID	16:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Full Rx"
+-	Comment "TTY Full Rx device"
+-
+-	EnableSequence
+-		'TTY Mode':0:FULL
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'HPHL DAC Switch':1:1
+-		'HPHL Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'TTY Mode':0:ZERO
+-		'RX1 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHL Volume':1:0
+-	EndSequence
+-
+-	ACDBID	17:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "TTY Full Tx"
+-	Comment "TTY Full Tx device"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:One
+-		'SLIM TX7 MUX':0:DEC8
+-		'DEC8 MUX':0:ADC2
+-		'ADC2 Volume':1:100
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC8 MUX':0:ZERO
+-		'ADC2 Volume':1:0
+-	EndSequence
+-
+-	ACDBID	16:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "BT SCO Rx"
+-	Comment "BT SCO Rx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	44:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "BT SCO Tx"
+-	Comment "BT SCO Tx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-    ACDBID  45:2
+-
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "BT SCO WB Rx"
+-	Comment "BT SCO Rx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	46:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "BT SCO WB Tx"
+-	Comment "BT SCO Tx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	47:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "HDMI"
+-	Comment "HDMI Rx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	18:1
+-	EffectsMixerCTL "SRS TruMedia HDMI"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "HDMI SPDIF"
+-	Comment "HDMI + SPDIF Rx combo device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID  18:1
+-	EffectsMixerCTL "SRS TruMedia HDMI"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "FM Tx"
+-	Comment "FM Tx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	0:1
+-	EffectsMixerCTL "SRS TruMedia FM"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx"
+-	Comment "PROXY Rx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Tx"
+-	Comment "PROXY Tx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	0:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "USB PROXY Rx"
+-    Comment "USB PROXY Rx device"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    ACDBID  40:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "USB PROXY Tx"
+-    Comment "USB PROXY Tx device"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    ACDBID  44:2
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF"
+-	Comment "SPDIF Rx device"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	0:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF Earpiece"
+-	Comment "SPDIF + Handset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'EAR PA Gain':0:POS_2_DB
+-		'DAC1 Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'DAC1 Switch':1:0
+-	EndSequence
+-
+-	ACDBID	7:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF Speaker"
+-	Comment "SPDIF + Speaker Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-	EndSequence
+-
+-	ACDBID	15:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF Headphones"
+-	Comment "SPDIF + Headset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:80
+-		'HPHR Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-	EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF ANC Headset"
+-	Comment "SPDIF + ANC Headset Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF Speaker Headset"
+-	Comment "SPDIF + Speaker Headset Rx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:80
+-		'HPHR Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-	EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SPDIF Speaker ANC Headset"
+-	Comment "SPDIF + Speaker ANC Headset Rx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "SSR QMIC"
+-	Comment "Quad mic device for Surround Sound Recording"
+-
+-	EnableSequence
+-		'PRI_TX Channels':0:Four
+-		'SLIM TX7 MUX':0:DEC9
+-		'DEC9 MUX':0:DMIC4
+-		'SLIM TX8 MUX':0:DEC10
+-		'DEC10 MUX':0:DMIC3
+-		'SLIM TX9 MUX':0:DEC7
+-		'DEC7 MUX':0:DMIC1
+-		'SLIM TX10 MUX':0:DEC6
+-		'DEC6 MUX':0:DMIC6
+-		'MICBIAS1 CAPLESS Switch':1:1
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS4 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SLIM TX7 MUX':0:ZERO
+-		'DEC9 MUX':0:ZERO
+-		'SLIM TX8 MUX':0:ZERO
+-		'DEC10 MUX':0:ZERO
+-		'SLIM TX9 MUX':0:ZERO
+-		'DEC7 MUX':0:ZERO
+-		'SLIM TX10 MUX':0:ZERO
+-		'DEC6 MUX':0:ZERO
+-		'MICBIAS1 CAPLESS Switch':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS4 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID  46:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Dummy Tx"
+-	Comment "Dummy Tx device, not a physical device just for routing"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	ACDBID	0:2
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx Earpiece"
+-	Comment "PROXY Rx + Handset Rx device combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:One
+-		'RX1 MIX1 INP1':0:RX1
+-		'EAR PA Gain':0:POS_2_DB
+-		'DAC1 Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'DAC1 Switch':1:0
+-	EndSequence
+-
+-	ACDBID	7:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx Speaker"
+-	Comment "PROXY Rx + Speaker Rx device combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-	EndSequence
+-
+-	ACDBID	15:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-    Name "USB PROXY Rx Speaker"
+-    Comment "USB PROXY Rx + Speaker Rx device combo device"
+-
+-    EnableSequence
+-        'SLIM RX1 MUX':0:AIF1_PB
+-        'SLIM RX2 MUX':0:AIF1_PB
+-        'SLIM_0_RX Channels':0:Two
+-        'RX3 MIX1 INP1':0:RX1
+-        'RX5 MIX1 INP1':0:RX2
+-        'RX4 DSM MUX':0:DSM_INV
+-        'RX6 DSM MUX':0:DSM_INV
+-        'LINEOUT1 Volume':1:66
+-        'LINEOUT2 Volume':1:66
+-        'LINEOUT3 Volume':1:66
+-        'LINEOUT4 Volume':1:66
+-        'RX3 Digital Volume':1:68
+-        'RX4 Digital Volume':1:68
+-        'RX5 Digital Volume':1:68
+-        'RX6 Digital Volume':1:68
+-    EndSequence
+-
+-    DisableSequence
+-        'SLIM RX1 MUX':0:ZERO
+-        'SLIM RX2 MUX':0:ZERO
+-        'RX3 MIX1 INP1':0:ZERO
+-        'RX5 MIX1 INP1':0:ZERO
+-        'RX4 DSM MUX':0:CIC_OUT
+-        'RX6 DSM MUX':0:CIC_OUT
+-        'LINEOUT1 Volume':1:0
+-        'LINEOUT2 Volume':1:0
+-        'LINEOUT3 Volume':1:0
+-        'LINEOUT4 Volume':1:0
+-    EndSequence
+-
+-    ACDBID  40:1
+-    EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx Headphones"
+-	Comment "PROXY Rx + Headphone Rx device combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:80
+-		'HPHR Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-	EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx Speaker Headset"
+-	Comment "PROXY Rx + Speaker Headset Rx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:80
+-		'HPHR Volume':1:80
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-	EndSequence
+-
+-	ACDBID	10:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx Speaker ANC Headset"
+-	Comment "PROXY Rx + Speaker ANC Headset Rx combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX3 MIX1 INP1':0:RX1
+-		'RX5 MIX1 INP1':0:RX2
+-		'RX4 DSM MUX':0:DSM_INV
+-		'RX6 DSM MUX':0:DSM_INV
+-		'LINEOUT1 Volume':1:66
+-		'LINEOUT2 Volume':1:66
+-		'LINEOUT3 Volume':1:66
+-		'LINEOUT4 Volume':1:66
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX3 MIX1 INP1':0:ZERO
+-		'RX5 MIX1 INP1':0:ZERO
+-		'RX4 DSM MUX':0:CIC_OUT
+-		'RX6 DSM MUX':0:CIC_OUT
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT2 Volume':1:0
+-		'LINEOUT3 Volume':1:0
+-		'LINEOUT4 Volume':1:0
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "PROXY Rx ANC Headset"
+-	Comment "PROXY Rx ANC Headset Rx device combo device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX1 MIX1 INP1':0:RX1
+-		'RX2 MIX1 INP1':0:RX2
+-		'HPHL DAC Switch':1:1
+-		'HPHR DAC Switch':1:1
+-		'HPHL Volume':1:70
+-		'HPHR Volume':1:70
+-		'RX1 Digital Volume':1:65
+-		'RX2 Digital Volume':1:65
+-		'ANC Slot':1:0
+-		'ANC1 MUX':0:ADC4
+-		'ANC2 MUX':0:ADC3
+-		'ANC1 FB MUX':0:EAR_HPH_L
+-		'ADC3 Volume':1:85
+-		'ADC4 Volume':1:85
+-		'MICBIAS3 CAPLESS Switch':1:1
+-		'MICBIAS1 CAPLESS Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'RX1 MIX1 INP1':0:ZERO
+-		'RX2 MIX1 INP1':0:ZERO
+-		'HPHL DAC Switch':1:0
+-		'HPHR DAC Switch':1:0
+-		'HPHL Volume':1:0
+-		'HPHR Volume':1:0
+-		'RX1 Digital Volume':1:0
+-		'RX2 Digital Volume':1:0
+-		'ANC1 MUX':0:ZERO
+-		'ANC2 MUX':0:ZERO
+-		'ADC3 Volume':1:0
+-		'ADC4 Volume':1:0
+-		'MICBIAS3 CAPLESS Switch':1:0
+-		'MICBIAS1 CAPLESS Switch':1:0
+-	EndSequence
+-
+-	ACDBID	26:1
+-	EffectsMixerCTL "SRS TruMedia"
+-
+-EndSection
+-
+-SectionDevice
+-	Name "Dock"
+-	Comment "Dock Rx device"
+-
+-	EnableSequence
+-		'PRI_RX Channels':0:Two
+-		'RX7 MIX1 INP1':0:RX1
+-		'RX3 MIX1 INP1':0:RX2
+-		'LINEOUT1 Volume':1:91%
+-		'LINEOUT5 Volume':1:91%
+-	EndSequence
+-
+-	DisableSequence
+-		'RX7 MIX1 INP1':0:ZERO
+-		'RX3 MIX1 INP1':0:ZERO
+-		'LINEOUT1 Volume':1:0
+-		'LINEOUT5 Volume':1:0
+-	EndSequence
+-
+-	ACDBID  40:1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSpeaker FM Tx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicFM Tx"
+-	Comment "Modifier for music playback on FM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicHDMI"
+-	Comment "Modifier for music playback on HDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicHDMI SPDIF"
+-	Comment "Modifier for music playback on HDMI SPDIF"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia1':1:1
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia1':1:0
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicBT SCO Rx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicBT SCO WB Rx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicPROXY Rx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play MusicUSB PROXY Rx"
+-
+-    EnableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 0
+-    PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2Speaker FM Tx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2FM Tx"
+-	Comment "Modifier for music playback on FM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2HDMI"
+-	Comment "Modifier for music playback on HDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2HDMI SPDIF"
+-	Comment "Modifier for music playback on HDMI SPDIF"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia2':1:1
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia2':1:0
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2BT SCO Rx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2BT SCO WB Rx"
+-	Comment "Modifier for music playback"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2PROXY Rx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 1
+-	PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play FM"
+-
+-	EnableSequence
+-		'Internal FM RX Volume':1:0
+-		'PRI_RX Port Mixer INTERNAL_FM_TX':1:1
+-		'SLIMBUS_DL_HL Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Port Mixer INTERNAL_FM_TX':1:0
+-		'SLIMBUS_DL_HL Switch':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 5
+-	CapturePCM 6
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play FMPROXY Rx"
+-
+-	EnableSequence
+-		'Internal FM RX Volume':1:0
+-		'AFE_PCM_RX Port Mixer INTERNAL_FM_TX':1:1
+-		'PCM_RX_DL_HL Switch':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX Port Mixer INTERNAL_FM_TX':1:0
+-		'PCM_RX_DL_HL Switch':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 5
+-	CapturePCM 6
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture FM"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer INTERNAL_FM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer INTERNAL_FM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 0
+-	CapturePCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPA"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPASpeaker FM Tx"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPAFM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPAHDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPABT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPABT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPAPROXY Rx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play LPAUSB PROXY Rx"
+-
+-    EnableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia3':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia3':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    PlaybackPCM 4
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture Music"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-
+-SectionModifier
+-	Name "Capture MusicBT SCO Tx"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer AUX_PCM_UL_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer AUX_PCM_UL_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture MusicBT SCO WB Tx"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer AUX_PCM_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Voice"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer PRI_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer PRI_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 2
+-	PlaybackPCM 2
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play SGLTE"
+-
+-        EnableSequence
+-                'PRI_RX_Voice Mixer SGLTE':1:1
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX_Voice Mixer SGLTE':1:0
+-                'SGLTE_Tx Mixer PRI_TX_SGLTE':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 13
+-        PlaybackPCM 13
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoiceBT SCO Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoiceBT SCO Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoiceBT SCO WB Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoiceBT SCO WB Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-		'AUX_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AUX_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture Voice"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture A2DP FM"
+-
+-        EnableSequence
+-                'MultiMedia2 Mixer INTERNAL_FM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia2 Mixer INTERNAL_FM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-	PlaybackPCM 1
+-	CapturePCM 1
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIP"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer PRI_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer PRI_TX_Voip':1:0
+-	EndSequence
+-
+-       # ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPBT SCO Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:0
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPBT SCO Tx"
+-
+-	EnableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:1
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play VOIPBT SCO WB Rx"
+-
+-        EnableSequence
+-        EndSequence
+-
+-        DisableSequence
+-                'Internal BTSCO SampleRate':0:8000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:0
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 3
+-        CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play VOIPBT SCO WB Tx"
+-
+-        EnableSequence
+-                'Internal BTSCO SampleRate':0:16000
+-                'AUX_PCM_RX_Voice Mixer Voip':1:1
+-                'Voip_Tx Mixer AUX_PCM_TX_Voip':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 3
+-        CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPHDMI"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer PRI_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPHDMI Tx"
+-
+-	EnableSequence
+-		'HDMI_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer PRI_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 3
+-	CapturePCM 3
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture Voice Downlink"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer VOC_REC_DL':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer VOC_REC_DL':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 0
+-        CapturePCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture Voice Uplink Downlink"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer VOC_REC_UL':1:1
+-                'MultiMedia1 Mixer VOC_REC_DL':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer VOC_REC_UL':1:0
+-                'MultiMedia1 Mixer VOC_REC_DL':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 0
+-        CapturePCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Tunnel"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSpeaker FM Tx"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelFM Tx"
+-
+-	EnableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'INTERNAL_FM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelHDMI"
+-
+-	EnableSequence
+-		'HDMI Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'HDMI Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelHDMI SPDIF"
+-
+-        EnableSequence
+-                'HDMI Mixer MultiMedia4':1:1
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI Mixer MultiMedia4':1:0
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelBT SCO Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelBT SCO WB Rx"
+-
+-	EnableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'AUX_PCM_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelPROXY Rx"
+-
+-        EnableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-		'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelUSB PROXY Rx"
+-
+-        EnableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency Music"
+-    Comment "Modifier for Lowlatency music playback"
+-
+-    EnableSequence
+-        'PRI_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'PRI_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicSpeaker FM Tx"
+-    Comment "Modifier for Lowlatency music playback"
+-
+-    EnableSequence
+-        'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:1
+-        'PRI_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'INTERNAL_FM_RX Audio Mixer MultiMedia5':1:0
+-        'PRI_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicHDMI"
+-    Comment "Modifier for music playback on HDMI"
+-
+-    EnableSequence
+-        'HDMI Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'HDMI Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Lowlatency MusicHDMI Speaker"
+-        Comment "Modifier for music playback on HDMI Speaker"
+-
+-        EnableSequence
+-                'HDMI Mixer MultiMedia5':1:1
+-                'PRI_RX Audio Mixer MultiMedia5':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI Mixer MultiMedia5':1:0
+-                'PRI_RX Audio Mixer MultiMedia5':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicHDMI SPDIF"
+-    Comment "Modifier for music playback on HDMI SPDIF"
+-
+-    EnableSequence
+-        'HDMI Mixer MultiMedia5':1:1
+-        'SEC_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'HDMI Mixer MultiMedia5':1:0
+-        'SEC_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicBT SCO Rx"
+-    Comment "Modifier for music playback"
+-
+-    EnableSequence
+-        'AUX_PCM_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AUX_PCM_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicBT SCO WB Rx"
+-    Comment "Modifier for music playback"
+-
+-    EnableSequence
+-        'AUX_PCM_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AUX_PCM_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicPROXY Rx"
+-
+-    EnableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play Lowlatency MusicUSB PROXY Rx"
+-
+-    EnableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia5':1:1
+-    EndSequence
+-
+-    DisableSequence
+-        'AFE_PCM_RX Audio Mixer MultiMedia5':1:0
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-
+-SectionModifier
+-        Name "Capture Lowlatency Music"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 10
+-        PlaybackPCM 10
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture Lowlatency Music"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer SLIM_0_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 10
+-        PlaybackPCM 10
+-
+-EndSection
+-
+-
+-SectionModifier
+-        Name "Capture Lowlatency MusicBT SCO Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 10
+-        PlaybackPCM 10
+-
+-EndSection
+-SectionModifier
+-        Name "Capture Lowlatency MusicBT SCO WB Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer INTERNAL_BT_SCO_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 10
+-        PlaybackPCM 10
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Capture Lowlatency MusicPROXY Rx"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Capture Lowlatency MusicUSB PROXY Rx"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 14
+-    PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture Lowlatency MusicPROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture Lowlatency MusicUSB PROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia5 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 14
+-        PlaybackPCM 14
+-
+-EndSection
+-
+-
+-SectionModifier
+-	Name "Play MusicSPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicSPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:1
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia1':1:0
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play Music2SPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:1
+-		'PRI_RX Audio Mixer MultiMedia2':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia2':1:0
+-		'PRI_RX Audio Mixer MultiMedia2':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF Speaker"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF Earpiece"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF Headphones"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF Speaker Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play TunnelSPDIF Speaker ANC Headset"
+-
+-	EnableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:1
+-		'PRI_RX Audio Mixer MultiMedia4':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'SEC_RX Audio Mixer MultiMedia4':1:0
+-		'PRI_RX Audio Mixer MultiMedia4':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture MusicPROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Capture MusicUSB PROXY Tx"
+-
+-        EnableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'MultiMedia1 Mixer AFE_PCM_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoicePROXY Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer AFE_PCM_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoicePROXY Tx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX_Voice Mixer CSVoice':1:1
+-		'Voice_Tx Mixer AFE_PCM_TX_Voice':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoiceDock"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer CSVoice':1:0
+-		'Voice_Tx Mixer PRI_TX_Voice':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	capturePCM 2
+-	ACDBID 0:0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPPROXY Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-		'AFE_PCM_RX_Voice Mixer Voip':1:0
+-		'Voip_Tx Mixer AFE_PCM_TX_Voip':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VOIPPROXY Tx"
+-
+-	EnableSequence
+-		'AFE_PCM_RX_Voice Mixer Voip':1:1
+-		'Voip_Tx Mixer AFE_PCM_TX_Voip':1:1
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 2
+-	CapturePCM 2
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicPROXY Tx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play MusicUSB PROXY Tx"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 0
+-    PlaybackPCM 0
+-
+-EndSection
+-SectionModifier
+-	Name "Play LPAPROXY Tx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Play LPAUSB PROXY Tx"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 0
+-    PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play FMPROXY Tx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture MusicPROXY Rx"
+-
+-	EnableSequence
+-	EndSequence
+-
+-	DisableSequence
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-    Name "Capture MusicUSB PROXY Rx"
+-
+-    EnableSequence
+-    EndSequence
+-
+-    DisableSequence
+-    EndSequence
+-
+-    # ALSA PCMs
+-    CapturePCM 0
+-    PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Capture MusicSSR QMIC"
+-
+-	EnableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'MultiMedia1 Mixer PRI_TX':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MI2S"
+-
+-        EnableSequence
+-                'PRI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'PRI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 5
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MI2SSpeaker"
+-
+-        EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-		'SLIMBUS_DL_HL Switch':1:1
+-		'PRI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-		'SLIMBUS_DL_HL Switch':1:0
+-		'PRI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 5
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MI2SHDMI"
+-
+-        EnableSequence
+-                'HDMI_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'HDMI_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 11
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MI2SSPDIF"
+-
+-        EnableSequence
+-                'SEC_I2S_RX Port Mixer MI2S_TX':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'SEC_I2S_RX Port Mixer MI2S_TX':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 12
+-        PlaybackPCM 13
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play VoLTE"
+-
+-	EnableSequence
+-		'PRI_RX_Voice Mixer VoLTE':1:1
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX_Voice Mixer VoLTE':1:0
+-		'VoLTE_Tx Mixer PRI_TX_VoLTE':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 12
+-	capturePCM 12
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play MusicPROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:1
+-                'PRI_RX Audio Mixer MultiMedia1':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia1':1:0
+-                'PRI_RX Audio Mixer MultiMedia1':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 0
+-        PlaybackPCM 0
+-
+-EndSection
+-
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Music2PROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:1
+-                'PRI_RX Audio Mixer MultiMedia2':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia2':1:0
+-                'PRI_RX Audio Mixer MultiMedia2':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        CapturePCM 1
+-        PlaybackPCM 1
+-
+-EndSection
+-
+-SectionModifier
+-
+-        Name "Play TunnelPROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-
+-        Name "Play TunnelUSB PROXY Rx Speaker"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelPROXY Rx Earpiece"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play Tunnel TunnelPROXY Rx Headphones"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelPROXY Rx ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelPROXY Rx Speaker Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-        Name "Play TunnelPROXY Rx Speaker ANC Headset"
+-
+-        EnableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:1
+-                'PRI_RX Audio Mixer MultiMedia4':1:1
+-        EndSequence
+-
+-        DisableSequence
+-                'AFE_PCM_RX Audio Mixer MultiMedia4':1:0
+-                'PRI_RX Audio Mixer MultiMedia4':1:0
+-        EndSequence
+-
+-        # ALSA PCMs
+-        PlaybackPCM 9
+-
+-EndSection
+-
+-SectionModifier
+-	Name "Play MusicDock"
+-	Comment "Modifier for docked music playback"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia1':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	CapturePCM 0
+-	PlaybackPCM 0
+-EndSection
+-
+-SectionModifier
+-	Name "Play LPADock"
+-
+-	EnableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:1
+-	EndSequence
+-
+-	DisableSequence
+-		'PRI_RX Audio Mixer MultiMedia3':1:0
+-	EndSequence
+-
+-	# ALSA PCMs
+-	PlaybackPCM 4
+-EndSection
+-
+-# End of master file
+diff --git a/device.mk b/device.mk
+index 69df616..bfe7ad5 100644
+--- a/device.mk
++++ b/device.mk
+@@ -31,8 +31,10 @@
+ 
+ # Audio configuration
+ PRODUCT_COPY_FILES += \
+-    device/samsung/d2-common/audio/snd_soc_msm_2x:system/etc/snd_soc_msm/snd_soc_msm_2x \
+-    device/samsung/d2-common/audio/audio_policy.conf:system/etc/audio_policy.conf
++    $(LOCAL_PATH)/audio/audio_effects.conf:system/vendor/etc/audio_effects.conf \
++    $(LOCAL_PATH)/audio/audio_platform_info.xml:system/etc/audio_platform_info.xml \
++    $(LOCAL_PATH)/audio/audio_policy.conf:system/etc/audio_policy.conf \
++    $(LOCAL_PATH)/audio/mixer_paths.xml:system/etc/mixer_paths.xml
+ 
+ # Camera
+ PRODUCT_PACKAGES += \
+@@ -95,6 +97,10 @@
+ PRODUCT_COPY_FILES += \
+     device/samsung/d2-common/selective-spn-conf.xml:system/etc/selective-spn-conf.xml
+ 
++# Voice processing
++PRODUCT_PACKAGES += \
++    libqcomvoiceprocessing
++
+ # Wifi
+ PRODUCT_COPY_FILES += \
+     device/samsung/d2-common/wifi/wpa_supplicant_overlay.conf:system/etc/wifi/wpa_supplicant_overlay.conf \
+diff --git a/system_prop.mk b/system_prop.mk
+index 8860c51..5b6e894 100644
+--- a/system_prop.mk
++++ b/system_prop.mk
+@@ -4,11 +4,11 @@
+ # audio
+ PRODUCT_PROPERTY_OVERRIDES += \
+     audio.offload.disable=1 \
+-    persist.audio.fluence.mode=endfire \
+-    persist.audio.vr.enable=false \
+-    persist.audio.handset.mic=digital \
+-    persist.audio.speaker.location=high \
+-    ro.qc.sdk.audio.fluencetype=fluence
++    ro.qc.sdk.audio.fluencetype=fluence \
++    persist.audio.fluence.voicecall=true \
++    persist.audio.fluence.voicerec=false \
++    persist.audio.fluence.speaker=true \
++    use.dedicated.device.for.voip=true
+ 
+ # radio
+ PRODUCT_PROPERTY_OVERRIDES += \

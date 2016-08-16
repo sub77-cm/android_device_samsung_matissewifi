@@ -1,0 +1,95 @@
+From bfba6c4bc5269af9e80491d19caf75563429407c Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 08 Aug 2016 23:31:43 +0200
+Subject: [PATCH] msm8226-common: Get rid of charge_only_mode
+
+* Use /charger instead
+
+Change-Id: Id09825528b0647cdffdb2cdb7c104e6ac5a77599
+---
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 90524e7..ceb1fd7 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -90,9 +90,6 @@
+ etc/firmware/cpp_firmware_v1_1_6.fw
+ etc/firmware/cpp_firmware_v1_2_0.fw
+ 
+-# Charger
+-bin/charge_only_mode
+-
+ # DRM
+ bin/qseecomd
+ lib/libdrmdecrypt.so
+diff --git a/rootdir/etc/init.qcom.rc b/rootdir/etc/init.qcom.rc
+index 7935127..64a818c 100644
+--- a/rootdir/etc/init.qcom.rc
++++ b/rootdir/etc/init.qcom.rc
+@@ -523,9 +523,10 @@
+     user root
+     oneshot
+ 
+-service charge_only_mode /system/bin/charge_only_mode
+-    user root
+-    disabled
++service charger /charger
++    class charger
++    group log
++    seclabel u:r:healthd:s0
+ 
+ service mpdecision /system/bin/mpdecision --avg_comp
+     user root
+@@ -728,7 +729,6 @@
+     write /sys/devices/system/cpu/cpu1/online 1
+     write /sys/devices/system/cpu/cpu2/online 1
+     write /sys/devices/system/cpu/cpu3/online 1
+-    start charge_only_mode
+ 
+ on property:sys.boot_completed=1
+     write /sys/module/lpm_levels/enable_low_power/l2 4
+diff --git a/sepolicy/charge_only_mode.te b/sepolicy/charge_only_mode.te
+deleted file mode 100644
+index a62deef..0000000
+--- a/sepolicy/charge_only_mode.te
++++ /dev/null
+@@ -1,20 +0,0 @@
+-type charge_only_mode, domain;
+-type charge_only_mode_exec, exec_type, file_type;
+-init_daemon_domain(charge_only_mode)
+-
+-allow charge_only_mode self:capability { sys_boot dac_override sys_tty_config net_admin };
+-
+-allow charge_only_mode self:netlink_kobject_uevent_socket create_socket_perms;
+-
+-allow charge_only_mode graphics_device:dir search;
+-allow charge_only_mode graphics_device:chr_file rw_file_perms;
+-allow charge_only_mode input_device:dir search;
+-allow charge_only_mode input_device:chr_file { read open };
+-allow charge_only_mode tty_device:chr_file { read write open ioctl };
+-allow charge_only_mode sysfs_power:file { read write open };
+-allow charge_only_mode sysfs_wake_lock:file { read write open };
+-allow charge_only_mode sysfs_light:file { read write open };
+-allow charge_only_mode sysfs_battery_supply:dir search;
+-allow charge_only_mode sysfs_battery_supply:file { read open };
+-allow charge_only_mode sysfs_usb_supply:dir search;
+-allow charge_only_mode sysfs_usb_supply:file { read open };
+diff --git a/sepolicy/file_contexts b/sepolicy/file_contexts
+index 9675e72..e970fe5 100644
+--- a/sepolicy/file_contexts
++++ b/sepolicy/file_contexts
+@@ -1,7 +1,6 @@
+ # Binaries
+ /system/bin/akmd8963                                        u:object_r:akmd8963_exec:s0
+ /system/bin/batt_health                                     u:object_r:batt_health_exec:s0
+-/system/bin/charge_only_mode                                u:object_r:charge_only_mode_exec:s0
+ /system/bin/dbvc_atvc_property_set                          u:object_r:atvc_exec:s0
+ /system/bin/sensord                                         u:object_r:sensord_exec:s0
+ /system/bin/dump_pds.sh                                     u:object_r:dump_pds_exec:s0
+diff --git a/sepolicy/healthd.te b/sepolicy/healthd.te
+new file mode 100644
+index 0000000..a7ec774
+--- /dev/null
++++ b/sepolicy/healthd.te
+@@ -0,0 +1 @@
++allow healthd device:dir r_dir_perms;
