@@ -1,0 +1,49 @@
+From 3a7cf680d839c03305c84f2297cf77cd516f3c15 Mon Sep 17 00:00:00 2001
+From: sub77 <sub77@ymail.com>
+Date: Tue, 16 Aug 2016 22:58:46 +0000
+Subject: [PATCH] Remove SEANDROIDENFORCING Tag
+
+Change-Id: I7262174273eed813abbc5c1ca718beba48e54b2d
+---
+ core/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/core/Makefile b/core/Makefile
+index b1fd44a..83f76a5 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -552,6 +552,7 @@ $(INSTALLED_BOOTIMAGE_TARGET): $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_FILES) $(BOOT_S
+ 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
+ 	$(BOOT_SIGNER) /boot $@ $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $@
+ 	$(hide) $(call assert-max-image-size,$@,$(BOARD_BOOTIMAGE_PARTITION_SIZE))
++	$(hide) echo -n "SEANDROIDENFORCE" >> $(PRODUCT_OUT)/boot.img
+ 	@echo -e ${CL_CYN}"Made boot image: $@"${CL_RST}
+ 
+ .PHONY: bootimage-nodeps
+@@ -560,6 +561,7 @@ bootimage-nodeps: $(MKBOOTIMG) $(BOOT_SIGNER)
+ 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(INSTALLED_BOOTIMAGE_TARGET)
+ 	$(BOOT_SIGNER) /boot $(INSTALLED_BOOTIMAGE_TARGET) $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $(INSTALLED_BOOTIMAGE_TARGET)
+ 	$(hide) $(call assert-max-image-size,$(INSTALLED_BOOTIMAGE_TARGET),$(BOARD_BOOTIMAGE_PARTITION_SIZE))
++	$(hide) echo -n "SEANDROIDENFORCE" >> $(PRODUCT_OUT)/boot.img
+ 	@echo -e ${CL_INS}"Made boot image: $@"${CL_RST}
+ 
+ else ifndef BOARD_CUSTOM_BOOTIMG_MK
+@@ -585,6 +587,7 @@ $(INSTALLED_BOOTIMAGE_TARGET): $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_FILES) $(BOOTIM
+ 	$(call pretty,"Target boot image: $@")
+ 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
+ 	$(hide) $(call assert-max-image-size,$@,$(BOARD_BOOTIMAGE_PARTITION_SIZE))
++	$(hide) echo -n "SEANDROIDENFORCE" >> $(PRODUCT_OUT)/boot.img
+ 	@echo -e ${CL_CYN}"Made boot image: $@"${CL_RST}
+ 
+ .PHONY: bootimage-nodeps
+@@ -592,6 +595,7 @@ bootimage-nodeps: $(MKBOOTIMG)
+ 	@echo "make $@: ignoring dependencies"
+ 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(INSTALLED_BOOTIMAGE_TARGET)
+ 	$(hide) $(call assert-max-image-size,$(INSTALLED_BOOTIMAGE_TARGET),$(BOARD_BOOTIMAGE_PARTITION_SIZE))
++	$(hide) echo -n "SEANDROIDENFORCE" >> $(PRODUCT_OUT)/boot.img
+ 	@echo -e ${CL_INS}"Made boot image: $@"${CL_RST}
+ 
+   endif # PRODUCT_SUPPORTS_VBOOT
+-- 
+2.5.0
+

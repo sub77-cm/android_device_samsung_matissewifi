@@ -1,0 +1,28 @@
+From 66d7f4634be9c3221dc784c86cb67d1cc1f67b6d Mon Sep 17 00:00:00 2001
+From: sub77 <sub77@ymail.com>
+Date: Tue, 16 Aug 2016 21:58:59 +0000
+Subject: [PATCH] CM_MOD_VERSION
+
+Change-Id: Ibbba135d651d313ca550a02c120e7cf9e6449cde
+---
+ config/common.mk | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/config/common.mk b/config/common.mk
+index ea5dcaa..261e943 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -322,6 +322,10 @@ else
+     endif
+ endif
+ 
++# Set all versions
++CM_VERSION := CM_$(CM_BUILD)_$(ANDROID_VERSION)_$(shell date -u +%Y%m%d-%H%M).$(CM_VERSION)-$(CM_BUILDTYPE)
++CM_MOD_VERSION := C;_$(CM_BUILD)_$(ANDROID_VERSION)_$(shell date -u +%Y%m%d-%H%M).$(CM_VERSION)-$(CM_BUILDTYPE)
++
+ PRODUCT_PROPERTY_OVERRIDES += \
+   ro.cm.version=$(CM_VERSION) \
+   ro.cm.releasetype=$(CM_BUILDTYPE) \
+-- 
+2.5.0
+

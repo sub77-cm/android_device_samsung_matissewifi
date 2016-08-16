@@ -2,6 +2,9 @@ build_root=$(pwd) # vendorsetup.sh is sourced by build/envsetup.sh in root of an
 
 . build/colors
 
+echo -e ""
+echo -e ${CL_RED}"Applying build commits"${CL_RST}
+
 cd $build_root/build
 git add --all
 git commit -m envsetup
