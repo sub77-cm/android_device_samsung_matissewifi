@@ -720,6 +720,7 @@ on property:ro.bluetooth.ftm_enabled=true
     start ftmd
 
 on property:vold.decrypt=trigger_restart_framework
+     start wcnss-service
 
 service cnd /system/bin/cnd
     class late_start
@@ -906,6 +907,12 @@ service amp_unload /system/bin/amploader -u
     user root
     disabled
     oneshot
+
+service wcnss-service /system/bin/wcnss_service
+     class main
+     user system
+     group system wifi qcom_diag radio
+     oneshot
 
 service wpa_supplicant /system/bin/wpa_supplicant -g@android:wpa_wlan0 \
     -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
