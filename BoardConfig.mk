@@ -27,7 +27,9 @@ TARGET_KERNEL_CONFIG := du_msm8226_defconfig
 TARGET_KERNEL_VARIANT_CONFIG := du_matissewifi_defconfig
 
 BOARD_MKBOOTIMG_ARGS := --ramdisk_offset 0x02000000 --tags_offset 0x01e00000
-BOARD_KERNEL_CMDLINE := console=null androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x3F androidboot.bootdevice=msm_sdcc.1
+BOARD_KERNEL_CMDLINE := console=null androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x3F
+BOARD_KERNEL_CMDLINE += androidboot.bootdevice=msm_sdcc.1
+BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 BOARD_KERNEL_BASE := 0x00000000
 BOARD_KERNEL_PAGESIZE := 2048
 BOARD_KERNEL_SEPARATED_DT := true
@@ -70,6 +72,7 @@ BOARD_RECOVERYIMAGE_PARTITION_SIZE := 20485760
 BOARD_USERDATAIMAGE_PARTITION_SIZE := 12759776768
 BOARD_SYSTEMIMAGE_PARTITION_SIZE := 2097152000
 BOARD_FLASH_BLOCK_SIZE := 131072
+
 
 # Power HAL
 TARGET_POWERHAL_VARIANT := qcom
