@@ -60,6 +60,10 @@ PRODUCT_PACKAGES += \
     libstlport \
     Snap
 
+# Ssl
+PRODUCT_PACKAGES += \
+    libboringssl-compat
+
 # GPS
 PRODUCT_PACKAGES += \
     gps.msm8226
