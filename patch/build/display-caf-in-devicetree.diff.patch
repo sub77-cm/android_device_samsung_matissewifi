@@ -1,0 +1,62 @@
+From 28ae75399f437edfd8521629dcf09caa18e0daa9 Mon Sep 17 00:00:00 2001
+From: Christopher R. Palmer <crpalmer@gmail.com>
+Date: Sun, 31 Jul 2016 07:55:07 -0400
+Subject: [PATCH] build: qcom: Allow devices to provide their own display hal
+
+At least for msm8996, the display-caf branches have created quite
+a mess for us with this HAL due to the way they designed the sdm
+extension library.
+
+Devices need to use this proprietary blob to get proper display
+support but private objects are passed back and forth between the
+extension library and other libraries built in the display HAL.
+
+There is no attempt to define an API that is respected and therefore
+you are tied to the version of the display-hal that your vendor used.
+
+The HTC 10 (pme) that was released using either LA.HB.1.3.1_rb1.5
+or rb1.11 (adreno blobs say rb1.11 but the kernel appears to be
+rb1.5).  There appears to be no way to use updated HALs because they
+have made the ExtensionInterface incompatible (adding an argument
+to CreateStrategy).
+
+Even if you hack around that, shim around that, etc. you are still
+not able to use the updated HALs because the extension library
+uses all kinds of private / internal objects directly.  In our
+case, HWDevice changed since rb1.5 making everything break.
+
+I haven't gone further down the rat-hole to try to make it work but
+it does work fine if I start from rb1.5 and patch it with our
+local patches to fit into our build system.
+
+With this commit, the display HAL can be imported into the device
+tree and maintained, much like GPS.
+
+Change-Id: I8a68345cf9d4dc68f4e18711bf9ff6ef5c9a2e05
+---
+
+diff --git a/core/qcom_target.mk b/core/qcom_target.mk
+index 3c8e68b..c61681c 100644
+--- a/core/qcom_target.mk
++++ b/core/qcom_target.mk
+@@ -90,11 +90,19 @@
+ else
+ $(call project-set-path,qcom-audio,hardware/qcom/audio-caf/$(QCOM_HARDWARE_VARIANT))
+ 
++ifneq ($(TARGET_SPECIFIC_DISPLAY_HAL),)
++$(call project-set-path,qcom-display,$(TARGET_SPECIFIC_DISPLAY_HAL))
++else
+ ifeq ($(SONY_BF64_KERNEL_VARIANT),true)
+ $(call project-set-path,qcom-display,hardware/qcom/display-caf/sony)
+-$(call project-set-path,qcom-media,hardware/qcom/media-caf/sony)
+ else
+ $(call project-set-path,qcom-display,hardware/qcom/display-caf/$(QCOM_HARDWARE_VARIANT))
++endif
++endif
++
++ifeq ($(SONY_BF64_KERNEL_VARIANT),true)
++$(call project-set-path,qcom-media,hardware/qcom/media-caf/sony)
++else
+ $(call project-set-path,qcom-media,hardware/qcom/media-caf/$(QCOM_HARDWARE_VARIANT))
+ endif
+ 

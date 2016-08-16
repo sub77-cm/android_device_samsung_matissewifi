@@ -1,0 +1,26 @@
+From bb454962789fddf3d2ad73c7f032dca5dc3d8709 Mon Sep 17 00:00:00 2001
+From: Jose Adolfo Galdamez <josegalre@gmail.com>
+Date: Sat, 30 Jul 2016 23:25:18 -0600
+Subject: [PATCH] build: kernel: don't show module tools, if not necessary
+
+Change-Id: I385b47e484e98401573960e8ac4ddee3c9f77599
+---
+
+diff --git a/core/tasks/kernel.mk b/core/tasks/kernel.mk
+index fab7722..75da467 100644
+--- a/core/tasks/kernel.mk
++++ b/core/tasks/kernel.mk
+@@ -307,8 +307,11 @@
+ $(TARGET_KERNEL_MODULES): TARGET_KERNEL_BINARIES
+ 
+ $(TARGET_PREBUILT_INT_KERNEL): $(TARGET_KERNEL_MODULES)
+-	$(mv-modules)
+-	$(clean-module-folder)
++	$(hide) if grep -q 'CONFIG_MODULES=y' $(KERNEL_CONFIG) ; \
++			then \
++				$(mv-modules) ; \
++				$(clean-module-folder) ; \
++			fi ;
+ 
+ $(KERNEL_HEADERS_INSTALL_STAMP): $(KERNEL_OUT_STAMP) $(KERNEL_CONFIG)
+ 	@echo -e ${CL_GRN}"Building Kernel Headers"${CL_RST}

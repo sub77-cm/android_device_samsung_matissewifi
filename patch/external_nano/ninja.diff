@@ -1,0 +1,26 @@
+From b79df43467fbd195ec4a5524d21a6e33be17d4b8 Mon Sep 17 00:00:00 2001
+From: luca020400 <luca.stefani.ge1@gmail.com>
+Date: Sun, 08 May 2016 18:33:20 +0200
+Subject: [PATCH] ninja-build: nano: don't use $(shell)
+
+Change-Id: Ia10eb0e3d1df9390d9b666c0ef013356ae0ed7aa
+---
+
+diff --git a/Android.mk b/Android.mk
+index 1b839f2..baa9d2a 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -41,11 +41,10 @@
+ # ========================================================
+ # nano configs
+ # ========================================================
+-etc_files := $(shell ls -1 $(LOCAL_PATH)/etc/)
++etc_files := $(wildcard $(LOCAL_PATH)/etc/*)
+ 
+ NANO_ETC := $(TARGET_OUT)/etc/$(LOCAL_MODULE)/
+-NANO_CONFIGS := $(addprefix $(LOCAL_PATH)/etc/,$(etc_files))
+-$(NANO_CONFIGS): NANO_BINARY := $(LOCAL_MODULE)
++NANO_CONFIGS := $(addprefix $(LOCAL_PATH)/etc/,$(notdir $(etc_files)))
+ $(NANO_CONFIGS): $(LOCAL_INSTALLED_MODULE)
+ 	@echo "Install: $@ -> $(NANO_ETC)"
+ 	@mkdir -p $(NANO_ETC)

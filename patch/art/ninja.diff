@@ -1,0 +1,33 @@
+From c4a94513a44296af8cd41eeeb54648eebcee596d Mon Sep 17 00:00:00 2001
+From: Shinichiro Hamaji <hamaji@google.com>
+Date: Fri, 18 Dec 2015 15:51:51 +0900
+Subject: [PATCH] Do not use $? in recipe
+
+Kati cannot support this automatic variable as ninja doesn't
+have a feature for this.
+
+Change-Id: I953603f71b3b2b862972d5d847dd2b16d035099a
+---
+
+diff --git a/build/Android.oat.mk b/build/Android.oat.mk
+index 728469c..a16921a 100644
+--- a/build/Android.oat.mk
++++ b/build/Android.oat.mk
+@@ -104,7 +104,7 @@
+ $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
+ $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
+ $$(core_image_name): $$(HOST_CORE_DEX_LOCATIONS) $$(core_dex2oat_dependency)
+-	@echo "host dex2oat: $$@ ($$?)"
++	@echo "host dex2oat: $$@"
+ 	@mkdir -p $$(dir $$@)
+ 	$$(hide) $(4) $$(DEX2OAT)$(5) --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
+ 	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \
+@@ -222,7 +222,7 @@
+ $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
+ $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
+ $$(core_image_name): $$(TARGET_CORE_DEX_FILES) $$(core_dex2oat_dependency)
+-	@echo "target dex2oat: $$@ ($$?)"
++	@echo "target dex2oat: $$@"
+ 	@mkdir -p $$(dir $$@)
+ 	$$(hide) $(4) $$(DEX2OAT)$(5) --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
+ 	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \

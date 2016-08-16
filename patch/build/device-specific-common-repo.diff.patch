@@ -1,0 +1,39 @@
+From 53e34de405ed8a387e524df58094646d75b6ac67 Mon Sep 17 00:00:00 2001
+From: Ethan Chen <intervigil@gmail.com>
+Date: Tue, 26 Apr 2016 16:37:14 -0700
+Subject: [PATCH] qcom: Allow device to specify a device-specific common repo
+
+* Allow devices to bring a common repo completely into the device repo.
+
+Change-Id: I520310610c73ee80625316719f3e82aebfb9555f
+---
+
+diff --git a/core/qcom_target.mk b/core/qcom_target.mk
+index 9fda1ff..f436e36 100644
+--- a/core/qcom_target.mk
++++ b/core/qcom_target.mk
+@@ -72,6 +72,7 @@
+ # HACK: check to see if build uses standard QC HAL paths by checking for CM path structure
+ AOSP_VARIANT_MAKEFILE := $(wildcard hardware/qcom/audio/default/Android.mk)
+ ifeq ("$(AOSP_VARIANT_MAKEFILE)","")
++$(call project-set-path,qcom-common,device/qcom/common)
+ $(call project-set-path,qcom-audio,hardware/qcom/audio)
+ $(call project-set-path,qcom-display,hardware/qcom/display)
+ $(call project-set-path,qcom-media,hardware/qcom/media)
+@@ -84,6 +85,8 @@
+ $(call project-set-path,wlan,hardware/qcom/wlan)
+ $(call project-set-path,bt-vendor,hardware/qcom/bt)
+ else
++$(call set-device-specific-path,COMMON,common,device/qcom/common)
++
+ $(call project-set-path,qcom-audio,hardware/qcom/audio-caf/$(QCOM_HARDWARE_VARIANT))
+ 
+ ifeq ($(SONY_BF64_KERNEL_VARIANT),true)
+@@ -106,6 +109,7 @@
+ endif # AOSP_VARIANT_MAKEFILE
+ 
+ else
++$(call project-set-path,qcom-common,device/qcom/common)
+ 
+ $(call project-set-path,qcom-audio,hardware/qcom/audio/default)
+ $(call project-set-path,qcom-display,hardware/qcom/display/$(TARGET_BOARD_PLATFORM))

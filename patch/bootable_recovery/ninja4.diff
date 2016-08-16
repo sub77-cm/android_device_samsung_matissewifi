@@ -1,0 +1,27 @@
+From 208473b3c0847079a0c00c15ea52472eeeadeed8 Mon Sep 17 00:00:00 2001
+From: Saleem Rashid <spudowiar@outlook.com>
+Date: Sun, 01 May 2016 07:42:05 +0100
+Subject: [PATCH] ninja-build: don't use $(shell) in other Make constructs [4/4]
+
+Change-Id: I74961c5dab346b78a09e82353e858b9d68ecbf33
+---
+
+diff --git a/Android.mk b/Android.mk
+index 2aeefde..014610c 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -182,12 +182,11 @@
+ 
+ # Run toybox-instlist and generate the rest of the symlinks
+ toybox_recovery_links: $(TOYBOX_INSTLIST)
+-toybox_recovery_links: TOY_LIST=$(shell $(TOYBOX_INSTLIST))
+ toybox_recovery_links: TOYBOX_BINARY := $(TARGET_RECOVERY_ROOT_OUT)/sbin/toybox
+ toybox_recovery_links:
+-	@echo -e ${CL_CYN}"Generate Toybox links:"${CL_RST} $(TOY_LIST)
++	@echo -e ${CL_CYN}"Generate Toybox links:"${CL_RST} $$($(TOYBOX_INSTLIST))
+ 	@mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/sbin
+-	$(hide) $(foreach t,$(TOY_LIST),ln -sf toybox $(TARGET_RECOVERY_ROOT_OUT)/sbin/$(t);)
++	$(hide) $(TOYBOX_INSTLIST) | xargs -I'{}' ln -sf toybox '$(TARGET_RECOVERY_ROOT_OUT)/sbin/{}'
+ 
+ # mkshrc
+ include $(CLEAR_VARS)

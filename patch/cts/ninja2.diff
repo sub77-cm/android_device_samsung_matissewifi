@@ -1,0 +1,21 @@
+From e9ecb041ac2a51e8e9cc9e40779584e82592ac75 Mon Sep 17 00:00:00 2001
+From: Saleem Rashid <spudowiar@outlook.com>
+Date: Sun, 01 May 2016 08:08:11 +0100
+Subject: [PATCH] ninja-build: don't use $(shell) in other Make constructs [2/4]
+
+Change-Id: If8adbcd0445b4d85de4ca1e7886f0a1da2c63167
+---
+
+diff --git a/build/test_deqp_package.mk b/build/test_deqp_package.mk
+index 650875c..fc03895 100644
+--- a/build/test_deqp_package.mk
++++ b/build/test_deqp_package.mk
+@@ -27,7 +27,7 @@
+ 	$(hide) echo Generating test description $@
+ 	$(hide) mkdir -p $(CTS_TESTCASES_OUT)
+ # Query build ABIs by routing a dummy test list through xml generator and parse result
+-	$(hide) $(eval supported_abi_attr := $(shell $(CTS_XML_GENERATOR) -t dummyTest \
++	$(hide) $(eval supported_abi_attr := $$($(CTS_XML_GENERATOR) -t dummyTest \
+ 										-n dummyName \
+ 										-p invalid.dummy \
+ 										-e $(CTS_EXPECTATIONS) \

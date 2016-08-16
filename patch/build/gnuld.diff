@@ -1,0 +1,28 @@
+From 204eeb4d6bb66eb5174d99804eb319be05d6f682 Mon Sep 17 00:00:00 2001
+From: Gabriele M <moto.falcon.git@gmail.com>
+Date: Sat, 14 Nov 2015 15:59:33 +0100
+Subject: [PATCH] kernel: Try to use GNU ld
+
+Some toolchains might not default to GNU ld, which is needed to
+properly build the kernel. Don't assume that ld is a symlink to ld.bfd
+or is ld.bfd itself. Instead, check if ld.bfd is available and use that.
+
+Change-Id: I418d983e327da856a4087369990aa44c38af5a61
+---
+
+diff --git a/core/tasks/kernel.mk b/core/tasks/kernel.mk
+index d43e8e1..5c50185 100644
+--- a/core/tasks/kernel.mk
++++ b/core/tasks/kernel.mk
+@@ -214,6 +214,11 @@
+     TARGET_KERNEL_MODULES := no-external-modules
+ endif
+ 
++# Try to directly select GNU ld
++ifneq ($(shell which $(KERNEL_TOOLCHAIN_PATH)ld.bfd),)
++    MAKE_FLAGS += LD=$(KERNEL_TOOLCHAIN_PATH)ld.bfd
++endif
++
+ $(KERNEL_OUT):
+ 	mkdir -p $(KERNEL_OUT)
+ 	mkdir -p $(KERNEL_MODULES_OUT)

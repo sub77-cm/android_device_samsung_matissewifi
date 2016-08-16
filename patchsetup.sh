@@ -1,5 +1,12 @@
 build_root=$(pwd) # vendorsetup.sh is sourced by build/envsetup.sh in root of android build tree. Hope that nobody can correctly source it not from root of android tree.
 
+. build/colors
+
+cd $build_root/build
+git add --all
+git commit -m envsetup
+cd $build_root
+
 echo -e ""
 echo -e ${CL_RED}"Applying patches"${CL_RST}
 echo -e ${CL_RST}"----------------"${CL_RST}

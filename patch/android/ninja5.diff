@@ -1,0 +1,21 @@
+From dc65c705faa3f96ebada30961fc8f1c252452474 Mon Sep 17 00:00:00 2001
+From: Saleem Rashid <spudowiar@outlook.com>
+Date: Sun, 01 May 2016 08:09:07 +0100
+Subject: [PATCH] ninja-build: fork platform/cts to CyanogenMod [5/4]
+
+Change-Id: I0a34c50f339ef9d7d0560ad4de1b56a8ef4bca63
+---
+
+diff --git a/default.xml b/default.xml
+index 78f22e8..44ff4bb 100644
+--- a/default.xml
++++ b/default.xml
+@@ -27,7 +27,7 @@
+   <project path="art" name="CyanogenMod/android_art" groups="pdk" />
+   <project path="bionic" name="CyanogenMod/android_bionic" groups="pdk" />
+   <project path="bootable/recovery" name="CyanogenMod/android_bootable_recovery" groups="pdk" />
+-  <project path="cts" name="platform/cts" groups="cts,pdk-cw-fs,pdk-fs" revision="marshmallow-cts-release" remote="aosp" />
++  <project path="cts" name="CyanogenMod/android_cts" groups="cts,pdk-cw-fs,pdk-fs" />
+   <project path="dalvik" name="CyanogenMod/android_dalvik" groups="pdk-cw-fs,pdk-fs" />
+   <project path="development" name="CyanogenMod/android_development" groups="pdk-cw-fs,pdk-fs" />
+   <project path="device/common" name="CyanogenMod/android_device_common" groups="pdk-cw-fs,pdk-fs" />
