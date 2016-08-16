@@ -1,0 +1,27 @@
+From 523ba857db6680796629d85c78fcf48d835e39c7 Mon Sep 17 00:00:00 2001
+From: Arnav Gupta <championswimmer@gmail.com>
+Date: Tue, 26 Jan 2016 14:52:10 +0000
+Subject: [PATCH] build: force rebuild build.prop
+
+build.prop is not rebuilt if there are only
+changes in PRODUCT_PROPERTY_OVERRIDES
+while ideally build.prop should be rebuilt
+if there are changes in it.
+
+Change-Id: I74a2c75600318bcee4968c2076bac4773e5d5e96
+Signed-off-by: Arnav Gupta <championswimmer@gmail.com>
+---
+
+diff --git a/core/Makefile b/core/Makefile
+index 7eca2db..c636342 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -78,6 +78,8 @@
+ ADDITIONAL_DEFAULT_PROPERTIES := $(call uniq-pairs-by-first-component, \
+     $(ADDITIONAL_DEFAULT_PROPERTIES),=)
+ 
++.PHONY: $(INSTALLED_BUILD_PROP_TARGET)
++
+ intermediate_system_build_prop := $(call intermediates-dir-for,ETC,system_build_prop)/build.prop
+ 
+ $(INSTALLED_DEFAULT_PROP_TARGET): $(intermediate_system_build_prop)
