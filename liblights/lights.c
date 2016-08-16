@@ -28,11 +28,13 @@
 #include <sys/types.h>
 #include <hardware/lights.h>
 
+#define UNUSED __attribute__((unused))
+
 static pthread_once_t g_init = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
-char const*const PANEL_FILE = "/sys/devices/virtual/lcd/panel/panel/backlight";
-char const*const BUTTON_FILE = "/sys/class/sec/sec_touchkey/brightness";
+char const*const PANEL_FILE = "/sys/class/leds/lcd-backlight/brightness";
+char const*const BUTTON_FILE = "/sys/class/leds/button-backlight/brightness";
 
 char const*const LED_BLINK = "/sys/class/sec/led/led_blink";
 
@@ -138,7 +140,7 @@ static int is_lit(struct light_state_t const* state)
     return state->color & 0x00ffffff;
 }
 
-static int set_light_backlight(struct light_device_t *dev,
+static int set_light_backlight(UNUSED struct light_device_t *dev,
             struct light_state_t const *state)
 {
     int err = 0;
@@ -152,7 +154,7 @@ static int set_light_backlight(struct light_device_t *dev,
 }
 
 static int
-set_light_buttons(struct light_device_t* dev,
+set_light_buttons(UNUSED struct light_device_t* dev,
         struct light_state_t const* state)
 {
     int err = 0;
@@ -182,7 +184,6 @@ static int write_leds(const struct led_config *led)
 
     char blink[32];
     int count, err;
-    int color;
 
     if (led == NULL)
         led = &led_off;
@@ -240,7 +241,7 @@ static int set_light_leds(struct light_state_t const *state, int type)
     default:
         return -EINVAL;
     }
-    
+
     led->color = state->color & 0x00ffffff;
 
     if (led->color > 0) {
@@ -274,19 +275,19 @@ switched:
     return err;
 }
 
-static int set_light_leds_battery(struct light_device_t *dev,
+static int set_light_leds_battery(UNUSED struct light_device_t *dev,
             struct light_state_t const *state)
 {
     return set_light_leds(state, 0);
 }
 
-static int set_light_leds_notifications(struct light_device_t *dev,
+static int set_light_leds_notifications(UNUSED struct light_device_t *dev,
             struct light_state_t const *state)
 {
     return set_light_leds(state, 1);
 }
 
-static int set_light_leds_attention(struct light_device_t *dev,
+static int set_light_leds_attention(UNUSED struct light_device_t *dev,
             struct light_state_t const *state)
 {
     struct light_state_t fixed;
@@ -305,7 +306,6 @@ static int set_light_leds_attention(struct light_device_t *dev,
          * just makes for a slightly-dimmer LED. */
         if (fixed.flashOnMS > 0 && fixed.flashOffMS == 0)
             fixed.flashMode = LIGHT_FLASH_NONE;
-	    fixed.color = 0x000000ff;
         break;
     }
 
@@ -356,7 +356,7 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
     .version_major = 1,
     .version_minor = 0,
     .id = LIGHTS_HARDWARE_MODULE_ID,
-    .name = "I9506 Lights Module",
+    .name = "D2 Lights Module",
     .author = "The CyanogenMod Project",
     .methods = &lights_module_methods,
 };
