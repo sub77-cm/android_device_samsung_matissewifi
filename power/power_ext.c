@@ -17,92 +17,103 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
-#include <pthread.h>
+#include <ctype.h>
 
-#define LOG_TAG "PowerHAL_KS01_Ext"
+#define LOG_TAG "PowerHAL_H_Ext"
 #include <utils/Log.h>
 
-#define TOUCHKEY_POWER "/sys/class/input/input2/enabled"
-#define TSP_POWER "/sys/class/input/input3/enabled"
-#define GPIO_KEYS_POWER "/sys/class/input/input18/enabled"
+#define MAX_INPUTS 20
+#define INPUT_PREFIX "/sys/class/input/input"
+#define MAX_PATH_SIZE (strlen(INPUT_PREFIX) + 20)
 
-static pthread_once_t g_init = PTHREAD_ONCE_INIT;
-static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static const char *names[] = { "sec_touchscreen", "gpio-keys" };
+#define N_NAMES (sizeof(names) / sizeof(names[0]))
+static char *paths[N_NAMES];
+static int have_found_paths;
 
-void init_g_lock(void)
+static size_t sysfs_read(char *path, char *buffer, size_t n)
 {
-    pthread_mutex_init(&g_lock, NULL);
+    char buf[80];
+    int fd;
+    ssize_t len;
+
+    if ((fd = open(path, O_RDONLY)) < 0) {
+        if (errno != ENOENT) {
+            strerror_r(errno, buf, sizeof(buf));
+            ALOGE("Error opening %s: %s\n", path, buf);
+        }
+        return 0;
+    }
+
+    len = read(fd, buffer, n);
+    if (len < 0) {
+        strerror_r(errno, buf, sizeof(buf));
+        ALOGE("Error reading from %s: %s\n", path, buf);
+        return 0;
+    }
+
+    while (len > 0 && isspace(buffer[len-1])) len--;
+    if ((size_t) len < n) buffer[len] = '\0';
+
+    close(fd);
+
+    return len;
 }
 
-void *input_onoff(void *arg) {
+static void sysfs_write(char *path, char *s)
+{
     char buf[80];
     int len;
-    char *onoff=(char*) arg;
-    char *path = TOUCHKEY_POWER;
+    int fd;
 
-    pthread_mutex_lock(&g_lock);
+    if (path == NULL) return;
 
-    int fd = open(path, O_WRONLY);
-
-    if (fd < 0) {
+    if ((fd = open(path, O_WRONLY)) < 0) {
         strerror_r(errno, buf, sizeof(buf));
         ALOGE("Error opening %s: %s\n", path, buf);
-    } else 
-        len = write(fd, onoff, 1);
+        return;
+    }
 
+    len = write(fd, s, strlen(s));
     if (len < 0) {
         strerror_r(errno, buf, sizeof(buf));
         ALOGE("Error writing to %s: %s\n", path, buf);
     }
 
     close(fd);
-
-    path = TSP_POWER;
-    fd = open(path, O_WRONLY);
-
-    if (fd < 0) {
-        strerror_r(errno, buf, sizeof(buf));
-        ALOGE("Error opening %s: %s\n", path, buf);
-    } else
-        len = write(fd, onoff, 1);
-
-    if (len < 0) {
-        strerror_r(errno, buf, sizeof(buf));
-        ALOGE("Error writing to %s: %s\n", path, buf);
-    }
-
-    close(fd);
-
-    path = GPIO_KEYS_POWER;
-    fd = open(path, O_WRONLY);
-
-    if (fd < 0) {
-        strerror_r(errno, buf, sizeof(buf));
-        ALOGE("Error opening %s: %s\n", path, buf);
-    } else
-        len = write(fd, onoff, 1);
-
-    if (len < 0) {
-        strerror_r(errno, buf, sizeof(buf));
-        ALOGE("Error writing to %s: %s\n", path, buf);
-    }
-
-    close(fd);
-
-    pthread_mutex_unlock(&g_lock);
-
-    return NULL;
 }
 
-void cm_power_set_interactive_ext(int on) {
+static void
+find_paths(void)
+{
+    size_t i, j;
+    char path[MAX_PATH_SIZE];
+    char name[20];
+
+    for (i = 0; i < MAX_INPUTS; i++) {
+        sprintf(path, "%s%d/name", INPUT_PREFIX, i);
+        if (sysfs_read(path, name, sizeof(name)) > 0) {
+            for (j = 0; j < N_NAMES; j++) {
+                if (strcmp(name, names[j]) == 0) {
+                    paths[j] = malloc(MAX_PATH_SIZE);
+                    sprintf(paths[j], "%s%d/enabled", INPUT_PREFIX, i);
+                    ALOGD("%s => %s\n", names[j], paths[j]);
+                }
+            }
+        }
+    }
+}
+
+void cm_power_set_interactive_ext(int on)
+{
+    size_t i;
+
     ALOGD("%s: %s input devices", __func__, on ? "enabling" : "disabling");
-    pthread_t pth;
-    pthread_attr_t threadAttr;
-    pthread_attr_init(&threadAttr); 
-    pthread_attr_setdetachstate(&threadAttr, PTHREAD_CREATE_DETACHED); 
-    pthread_once(&g_init, init_g_lock);
-    pthread_create(&pth,&threadAttr,input_onoff, (void*) on ? "1" : "0");
-    pthread_attr_destroy(&threadAttr);
+
+    if (! have_found_paths) {
+        find_paths();
+        have_found_paths = 1;
+    }
+
+    for (i = 0; i < N_NAMES; i++) sysfs_write(paths[i], on ? "1" : "0");
 }
-
-
